@@ -2,17 +2,11 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/lib/supabase";
+import type { RoundItem } from "@/app/api/rounds/route";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Round {
-  id: string;
-  date: string;
-  course: string;
-  score: number;
-  par: number;
-}
+type Round = RoundItem;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,23 +73,12 @@ export default function RoundsPage() {
   const [sort, setSort]       = useState<SortKey>("date-desc");
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("rounds")
-        .select("id, date, score, par, courses(name)")
-        .order("date", { ascending: false });
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setRounds((data ?? []).map((r: any) => ({
-        id:     r.id,
-        date:   r.date,
-        score:  r.score,
-        par:    r.par,
-        course: r.courses?.name ?? "Unknown",
-      })));
-      setLoading(false);
-    }
-    load();
+    fetch("/api/rounds")
+      .then((r) => r.json())
+      .then(({ rounds }) => {
+        setRounds(rounds);
+        setLoading(false);
+      });
   }, []);
 
   const byDateDesc = useMemo(

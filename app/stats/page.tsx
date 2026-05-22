@@ -6,19 +6,11 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { supabase } from "@/lib/supabase";
+import type { StatRound } from "@/app/api/stats/route";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Round {
-  id: string;
-  date: string;
-  course: string;
-  score: number;
-  par: number;
-  putts: number;
-  handicap: number;
-}
+type Round = StatRound;
 
 // ─── Filter Config ────────────────────────────────────────────────────────────
 
@@ -107,25 +99,12 @@ export default function StatsPage() {
   const [filter, setFilter]       = useState<RoundFilter>("last10");
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("rounds")
-        .select("id, date, score, par, putts, handicap, courses(name)")
-        .order("date", { ascending: true });
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setAllRounds((data ?? []).map((r: any) => ({
-        id:       r.id,
-        date:     r.date,
-        course:   r.courses?.name ?? "Unknown",
-        score:    r.score,
-        par:      r.par,
-        putts:    r.putts ?? 0,
-        handicap: r.handicap ?? 0,
-      })));
-      setLoading(false);
-    }
-    load();
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then(({ rounds }) => {
+        setAllRounds(rounds);
+        setLoading(false);
+      });
   }, []);
 
   const filtered = useMemo(() => applyFilter(allRounds, filter), [allRounds, filter]);

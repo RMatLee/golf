@@ -323,6 +323,9 @@ export default function LogRoundPage() {
       putts:     Number(roundForm.putts),
     });
 
+    // Invalidate Redis cache so next page load fetches fresh data
+    await fetch("/api/cache/invalidate", { method: "POST" });
+
     setSavedCourse(resolved ?? null);
     setSubmitting(false);
     setStep(2);
