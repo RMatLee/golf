@@ -29,6 +29,7 @@ export interface ClubRow {
   carry: string;
   loft: string;
   shaft: string;
+  media_url: string | null;
   created_at: string;
 }
 
