@@ -1,25 +1,31 @@
-"use client"; // Required for hooks
+"use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/auth-context";
 
 const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "Rounds", href: "/rounds" },
-  { label: "Stats", href: "/stats" },
-  { label: "Courses", href: "/courses" },
-  { label: "Clubs", href: "/clubs" },
-  { label: "Log Round", href: "/log-round" },
+  { label: "Home",      href: "/"         },
+  { label: "Rounds",    href: "/rounds"   },
+  { label: "Stats",     href: "/stats"    },
+  { label: "Courses",   href: "/courses"  },
+  { label: "Clubs",     href: "/clubs"    },
+  { label: "Log Round", href: "/log-round"},
 ];
 
 export default function Navbar() {
-  // Gets the current route path so we can highlight the active link
-  const pathname = usePathname();
+  const pathname    = usePathname();
+  const router      = useRouter();
+  const { session, loading, signOut } = useAuth();
+
+  async function handleSignOut() {
+    await signOut();
+    router.push("/");
+  }
 
   return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
-      {/* animates the entire pill fading in and sliding down on page load */}
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3">
       <motion.nav
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -27,7 +33,7 @@ export default function Navbar() {
         className="flex items-center gap-1 px-3 py-2 rounded-full border border-white/15 bg-black/40 backdrop-blur-md shadow-lg"
       >
         {navLinks.map((link) => {
-          const isActive = pathname === link.href;
+          const isActive   = pathname === link.href;
           const isLogRound = link.label === "Log Round";
 
           return (
@@ -56,6 +62,41 @@ export default function Navbar() {
           );
         })}
       </motion.nav>
+
+      {/* Auth control — discreet, outside the main pill */}
+      {!loading && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          {session ? (
+            <button
+              onClick={handleSignOut}
+              title="Sign out"
+              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/15 bg-black/40 backdrop-blur-md text-white/40 hover:text-white hover:border-white/30 transition-all"
+            >
+              {/* Lock-open icon */}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+              </svg>
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              title="Sign in"
+              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/15 bg-black/40 backdrop-blur-md text-white/20 hover:text-white/60 hover:border-white/25 transition-all"
+            >
+              {/* Lock icon */}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </Link>
+          )}
+        </motion.div>
+      )}
     </div>
   );
 }

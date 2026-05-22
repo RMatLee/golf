@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 import type { ClubType } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -126,7 +127,7 @@ function ClubModal({ isOpen, editTarget, defaultType, onClose, onSave }: {
 
 // ─── Club Row ─────────────────────────────────────────────────────────────────
 
-function ClubRow({ club, onEdit, onDelete }: { club: Club; onEdit: (club: Club) => void; onDelete: (id: string) => void; }) {
+function ClubRow({ club, isAdmin, onEdit, onDelete }: { club: Club; isAdmin: boolean; onEdit: (club: Club) => void; onDelete: (id: string) => void; }) {
   return (
     <motion.div layout initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
       transition={{ duration: 0.18 }}
@@ -138,24 +139,26 @@ function ClubRow({ club, onEdit, onDelete }: { club: Club; onEdit: (club: Club) 
         <span className="font-mono tabular-nums w-10 text-right">{club.loft}°</span>
         <span className="w-16">{club.shaft}</span>
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onEdit(club)}
-          className="px-2.5 py-1 rounded-lg text-xs text-white/40 hover:text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors">
-          Edit
-        </button>
-        <button onClick={() => onDelete(club.id)}
-          className="px-2.5 py-1 rounded-lg text-xs text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors">
-          ✕
-        </button>
-      </div>
+      {isAdmin && (
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onEdit(club)}
+            className="px-2.5 py-1 rounded-lg text-xs text-white/40 hover:text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors">
+            Edit
+          </button>
+          <button onClick={() => onDelete(club.id)}
+            className="px-2.5 py-1 rounded-lg text-xs text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+            ✕
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
 
-function SectionCard({ section, clubs, isOpen, onToggle, onAdd, onEdit, onDelete }: {
-  section: (typeof CLUB_SECTIONS)[number]; clubs: Club[]; isOpen: boolean;
+function SectionCard({ section, clubs, isOpen, isAdmin, onToggle, onAdd, onEdit, onDelete }: {
+  section: (typeof CLUB_SECTIONS)[number]; clubs: Club[]; isOpen: boolean; isAdmin: boolean;
   onToggle: () => void; onAdd: (type: ClubType) => void;
   onEdit: (club: Club) => void; onDelete: (id: string) => void;
 }) {
@@ -174,7 +177,7 @@ function SectionCard({ section, clubs, isOpen, onToggle, onAdd, onEdit, onDelete
             {!isOpen && <p className="text-xs text-white/40 mt-0.5">{clubs.length} {clubs.length === 1 ? "club" : "clubs"}</p>}
           </div>
           <div className="flex items-center gap-3">
-            {isOpen && (
+            {isOpen && isAdmin && (
               <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
                 onClick={(e) => { e.stopPropagation(); onAdd(section.type); }}
                 className="flex items-center gap-1.5 rounded-xl bg-[#c9a84c] px-3.5 py-1.5 text-xs font-bold text-black hover:bg-[#d4b86a] active:scale-95 transition-all">
@@ -210,7 +213,7 @@ function SectionCard({ section, clubs, isOpen, onToggle, onAdd, onEdit, onDelete
               <AnimatePresence>
                 {clubs.length === 0
                   ? <p className="text-xs text-white/25 italic px-7 py-4">No clubs yet — hit &quot;Add&quot; to get started.</p>
-                  : clubs.map((club) => <ClubRow key={club.id} club={club} onEdit={onEdit} onDelete={onDelete} />)
+                  : clubs.map((club) => <ClubRow key={club.id} club={club} isAdmin={isAdmin} onEdit={onEdit} onDelete={onDelete} />)
                 }
               </AnimatePresence>
             </div>
@@ -224,6 +227,9 @@ function SectionCard({ section, clubs, isOpen, onToggle, onAdd, onEdit, onDelete
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ClubsPage() {
+  const { session } = useAuth();
+  const isAdmin = !!session;
+
   const [clubs, setClubs]               = useState<Club[]>([]);
   const [loading, setLoading]           = useState(true);
   const [openSection, setOpenSection]   = useState<ClubType | null>(null);
@@ -232,8 +238,7 @@ export default function ClubsPage() {
   const [addingToType, setAddingToType] = useState<ClubType>("Irons");
 
   useEffect(() => {
-    supabase.from("clubs").select("*").order("created_at").then(({ data, error }) => {
-      console.log("clubs fetch → data:", data, "error:", error);
+    supabase.from("clubs").select("*").order("created_at").then(({ data }) => {
       setClubs((data ?? []) as Club[]);
       setLoading(false);
     });
@@ -281,6 +286,7 @@ export default function ClubsPage() {
                 section={section}
                 clubs={clubs.filter((c) => c.type === section.type)}
                 isOpen={openSection === section.type}
+                isAdmin={isAdmin}
                 onToggle={() => toggleSection(section.type)}
                 onAdd={openAdd}
                 onEdit={openEdit}

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 import type { CourseRow } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -271,6 +272,12 @@ const DEFAULT_ROUND: RoundForm = { date: TODAY, score: "", putts: "" };
 
 export default function LogRoundPage() {
   const router = useRouter();
+  const { session, loading: authLoading } = useAuth();
+
+  // Redirect unauthenticated users
+  useEffect(() => {
+    if (!authLoading && !session) router.replace("/login");
+  }, [authLoading, session, router]);
 
   const [courses, setCourses]       = useState<Course[]>([]);
   const [step, setStep]             = useState<0 | 1 | 2>(0);
@@ -328,6 +335,8 @@ export default function LogRoundPage() {
     setNewCourse(EMPTY_NEW_COURSE);
     setSavedCourse(null);
   }
+
+  if (authLoading || !session) return null;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">

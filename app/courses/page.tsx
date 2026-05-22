@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 import type { CourseRow } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -222,6 +223,9 @@ function DeleteConfirm({ course, onConfirm, onCancel }: { course: Course; onConf
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CoursesPage() {
+  const { session } = useAuth();
+  const isAdmin = !!session;
+
   const [courses, setCourses]           = useState<Course[]>([]);
   const [rounds, setRounds]             = useState<Round[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -302,13 +306,15 @@ export default function CoursesPage() {
               {loading ? "Loading…" : `${courses.length} courses · ${rounds.length} rounds logged`}
             </p>
           </div>
-          <button
-            onClick={() => { setEditTarget(null); setModalOpen(true); }}
-            className="flex items-center gap-2 rounded-xl bg-[#c9a84c] px-4 py-2.5 text-sm font-bold text-black hover:bg-[#d4b86a] active:scale-95 transition-all"
-          >
-            <span className="text-base leading-none">+</span>
-            Add Course
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setEditTarget(null); setModalOpen(true); }}
+              className="flex items-center gap-2 rounded-xl bg-[#c9a84c] px-4 py-2.5 text-sm font-bold text-black hover:bg-[#d4b86a] active:scale-95 transition-all"
+            >
+              <span className="text-base leading-none">+</span>
+              Add Course
+            </button>
+          )}
         </motion.div>
 
         {/* Recently played */}
@@ -373,16 +379,18 @@ export default function CoursesPage() {
                       <p className="text-sm text-white/50 tabular-nums">{timesPlayed}x</p>
                       <div className="flex items-center justify-end gap-2">
                         <span className="text-xs text-white/35 tabular-nums">{course.rating} / {course.slope}</span>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                          <button onClick={() => { setEditTarget(course); setModalOpen(true); }}
-                            className="px-2 py-1 rounded-lg text-xs text-white/40 hover:text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors">
-                            Edit
-                          </button>
-                          <button onClick={() => setDeleteTarget(course)}
-                            className="px-2 py-1 rounded-lg text-xs text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors">
-                            ✕
-                          </button>
-                        </div>
+                        {isAdmin && (
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                            <button onClick={() => { setEditTarget(course); setModalOpen(true); }}
+                              className="px-2 py-1 rounded-lg text-xs text-white/40 hover:text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors">
+                              Edit
+                            </button>
+                            <button onClick={() => setDeleteTarget(course)}
+                              className="px-2 py-1 rounded-lg text-xs text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+                              ✕
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   );
