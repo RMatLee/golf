@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { CourseSearch } from "@/components/CourseSearch";
@@ -57,11 +58,13 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
       style={{ height: "220px" }}
     >
       {!imgError && course.image ? (
-        <img
+        <Image
           src={courseImageSrc(course.image)}
           alt={course.name}
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           onError={() => setImgError(true)}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-white/2" />
@@ -139,7 +142,7 @@ function CourseModal({
     setImagePreview(URL.createObjectURL(file));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!form.name.trim()) return;
     setUploading(true);

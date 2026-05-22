@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
@@ -65,8 +66,17 @@ function SectionBackground({ media, override, isOpen }: {
     return <video key={effective.src} src={effective.src} autoPlay muted loop playsInline
       className={cls} style={{ filter: `brightness(${brightness})` }} />;
   }
-  return <img key={effective.src} src={effective.src} alt=""
-    className={cls} style={{ filter: `brightness(${brightness})` }} />;
+  return (
+    <Image
+      key={effective.src}
+      src={effective.src}
+      alt=""
+      fill
+      sizes="(max-width: 768px) 100vw, 42rem"
+      className="object-cover transition-all duration-500"
+      style={{ filter: `brightness(${brightness})` }}
+    />
+  );
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
