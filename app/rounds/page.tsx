@@ -68,15 +68,24 @@ function RecentCard({ round, index }: { round: Round; index: number }) {
 export default function RoundsPage() {
   const [rounds, setRounds]   = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
   const [search, setSearch]   = useState("");
   const [course, setCourse]   = useState("All");
   const [sort, setSort]       = useState<SortKey>("date-desc");
 
   useEffect(() => {
     fetch("/api/rounds")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json();
+      })
       .then(({ rounds }) => {
         setRounds(rounds);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Rounds fetch failed:", err);
+        setError(true);
         setLoading(false);
       });
   }, []);
@@ -171,7 +180,12 @@ export default function RoundsPage() {
               ))}
             </div>
             <AnimatePresence mode="popLayout">
-              {loading ? (
+              {error ? (
+                <motion.p key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="text-sm text-red-400/70 italic px-5 py-8 text-center">
+                  Could not load rounds. Check your connection and refresh.
+                </motion.p>
+              ) : loading ? (
                 <motion.p key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   className="text-sm text-white/25 italic px-5 py-8 text-center">
                   Loading rounds…

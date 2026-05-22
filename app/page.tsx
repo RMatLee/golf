@@ -14,13 +14,22 @@ export default function Home() {
 
   const [recentRounds, setRecentRounds] = useState<RecentRound[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
 
   useEffect(() => {
     fetch("/api/home")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json();
+      })
       .then(({ stats, recentRounds }) => {
         setStats(stats);
         setRecentRounds(recentRounds);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Home fetch failed:", err);
+        setError(true);
         setLoading(false);
       });
   }, []);
@@ -74,7 +83,13 @@ export default function Home() {
         </motion.h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {loading
+          {error
+            ? (
+                <p className="col-span-3 text-sm text-red-400/70 italic">
+                  Could not load recent rounds. Check your connection and refresh.
+                </p>
+              )
+            : loading
             ? Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-6 animate-pulse h-36" />
               ))

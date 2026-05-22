@@ -96,13 +96,22 @@ function ChartCard({ title, subtitle, children, delay = 0 }: {
 export default function StatsPage() {
   const [allRounds, setAllRounds] = useState<Round[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(false);
   const [filter, setFilter]       = useState<RoundFilter>("last10");
 
   useEffect(() => {
     fetch("/api/stats")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json();
+      })
       .then(({ rounds }) => {
         setAllRounds(rounds);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Stats fetch failed:", err);
+        setError(true);
         setLoading(false);
       });
   }, []);
@@ -171,7 +180,12 @@ export default function StatsPage() {
         </div>
 
         {/* Charts */}
-        {!loading && (
+        {error && (
+          <p className="text-sm text-red-400/70 italic">
+            Could not load stats. Check your connection and refresh.
+          </p>
+        )}
+        {!loading && !error && (
           <div className="flex flex-col gap-5">
             <ChartCard title="Score Trend" subtitle="Scoring" delay={0.2}>
               <ResponsiveContainer width="100%" height={220}>
