@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { CourseSearch } from "@/components/CourseSearch";
 import type { CourseRow } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,7 +41,13 @@ function useCourseStats(courses: Course[], rounds: Round[]) {
 
 // ─── Recent Course Card ───────────────────────────────────────────────────────
 
+function courseImageSrc(image: string): string {
+  if (!image) return "";
+  return image.startsWith("http") ? image : `/images/courses/${image}.jpg`;
+}
+
 function CourseCard({ course, index }: { course: Course; index: number }) {
+  const [imgError, setImgError] = useState(false);
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -49,11 +56,16 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
       className="relative overflow-hidden rounded-2xl border border-white/8 hover:border-[#c9a84c]/40 transition-all duration-300 group cursor-default"
       style={{ height: "220px" }}
     >
-      <img
-        src={`/images/courses/${course.image}.jpg`}
-        alt={course.name}
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-      />
+      {!imgError && course.image ? (
+        <img
+          src={courseImageSrc(course.image)}
+          alt={course.name}
+          onError={() => setImgError(true)}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-white/2" />
+      )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
       <div className="absolute inset-0 bg-gradient-to-br from-[#c9a84c]/0 to-[#c9a84c]/0 group-hover:from-[#c9a84c]/5 group-hover:to-transparent transition-all duration-300" />
       <div className="absolute inset-0 flex flex-col justify-end p-5">
@@ -74,17 +86,30 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
 function CourseModal({
-  isOpen, editTarget, onClose, onSave,
+  isOpen, editTarget, existingCourses, onClose, onSave,
 }: {
   isOpen: boolean;
   editTarget: Course | null;
+  existingCourses: Course[];
   onClose: () => void;
   onSave: (data: Omit<Course, "id" | "created_at">, id?: string) => void;
 }) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [lastKey, setLastKey] = useState<string | null>(null);
+  const [form, setForm]             = useState(EMPTY_FORM);
+  const [imageFile, setImageFile]   = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [uploading, setUploading]   = useState(false);
+  const [fileError, setFileError]   = useState("");
+  const [lastKey, setLastKey]       = useState<string | null>(null);
   const key = editTarget?.id ?? "new";
+
+  // True when the typed name matches an existing course (excluding the one being edited)
+  const isDuplicate = form.name.trim().length > 0 && existingCourses.some(
+    (c) => c.id !== editTarget?.id && c.name.toLowerCase() === form.name.trim().toLowerCase()
+  );
 
   if (key !== lastKey) {
     setLastKey(key);
@@ -93,11 +118,50 @@ function CourseModal({
         ? { name: editTarget.name, city: editTarget.city, par: String(editTarget.par), rating: String(editTarget.rating), slope: String(editTarget.slope) }
         : EMPTY_FORM
     );
+    setImageFile(null);
+    setFileError("");
+    setImagePreview(editTarget?.image ? courseImageSrc(editTarget.image) : "");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setFileError("Only JPG, PNG, WEBP, or GIF files are accepted.");
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError("File must be under 5 MB.");
+      return;
+    }
+    setFileError("");
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
+    setUploading(true);
+
+    let image = editTarget?.image ?? toImageSlug(form.name.trim());
+
+    if (imageFile) {
+      const ext      = imageFile.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const filePath = `${toImageSlug(form.name.trim())}-${Date.now()}.${ext}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("course-images")
+        .upload(filePath, imageFile, { upsert: true });
+
+      if (!uploadError && uploadData) {
+        const { data: { publicUrl } } = supabase.storage
+          .from("course-images")
+          .getPublicUrl(uploadData.path);
+        image = publicUrl;
+      }
+    }
+
+    setUploading(false);
     onSave(
       {
         name:   form.name.trim(),
@@ -105,7 +169,7 @@ function CourseModal({
         par:    Number(form.par)    || 72,
         rating: Number(form.rating) || 0,
         slope:  Number(form.slope)  || 113,
-        image:  toImageSlug(form.name.trim()),
+        image,
       },
       editTarget?.id
     );
@@ -121,62 +185,111 @@ function CourseModal({
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }} transition={{ duration: 0.22, ease: "easeOut" }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md px-4"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md px-4 max-h-[90vh] overflow-y-auto"
           >
             <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] shadow-2xl p-7">
               <p className="text-[11px] uppercase tracking-[0.22em] text-[#c9a84c] font-semibold mb-1">
                 {editTarget ? "Edit Course" : "New Course"}
               </p>
-              <h2 className="text-xl font-bold text-white mb-2">
+              <h2 className="text-xl font-bold text-white mb-6">
                 {editTarget ? editTarget.name : "Add a Course"}
               </h2>
-              {!editTarget && (
-                <p className="text-xs text-white/30 mb-6">
-                  Add an image named{" "}
-                  <span className="font-mono text-white/50">
-                    {form.name ? `${toImageSlug(form.name)}.jpg` : "your-course-name.jpg"}
-                  </span>{" "}
-                  to <span className="font-mono text-white/50">public/images/courses/</span>
-                </p>
-              )}
-              {editTarget && <div className="mb-6" />}
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div>
                   <label className="block text-[11px] uppercase tracking-widest text-white/35 mb-1.5">Course Name</label>
-                  <input type="text" placeholder="e.g. Whistling Straits" value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors"
-                    required />
+                  <CourseSearch
+                    value={form.name}
+                    onChange={(v) => setForm((f) => ({ ...f, name: v }))}
+                    onSelect={({ name, city }) => setForm((f) => ({ ...f, name, city }))}
+                    required
+                  />
+                  {isDuplicate && (
+                    <p className="text-xs text-red-400 mt-1.5">
+                      A course named &quot;{form.name.trim()}&quot; already exists.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] uppercase tracking-widest text-white/35 mb-1.5">City / Location</label>
-                  <input type="text" placeholder="e.g. Kohler, WI" value={form.city}
+                  <input
+                    type="text"
+                    placeholder="e.g. Kohler, WI"
+                    value={form.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors" />
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors"
+                    required
+                  />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { key: "par", label: "Par", placeholder: "72" },
-                    { key: "rating", label: "Rating", placeholder: "71.5" },
-                    { key: "slope", label: "Slope", placeholder: "131" },
+                    { key: "par",    label: "Par",    placeholder: "72",   min: "60",  max: "80",  step: "1"   },
+                    { key: "rating", label: "Rating", placeholder: "71.5", min: "50",  max: "80",  step: "0.1" },
+                    { key: "slope",  label: "Slope",  placeholder: "131",  min: "55",  max: "155", step: "1"   },
                   ].map((f) => (
                     <div key={f.key}>
                       <label className="block text-[11px] uppercase tracking-widest text-white/35 mb-1.5">{f.label}</label>
-                      <input type="text" placeholder={f.placeholder}
+                      <input
+                        type="number"
+                        placeholder={f.placeholder}
+                        min={f.min}
+                        max={f.max}
+                        step={f.step}
                         value={form[f.key as keyof typeof EMPTY_FORM]}
                         onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors" />
+                        onKeyDown={(e) => { if (["e","E","+","-"].includes(e.key)) e.preventDefault(); }}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        required
+                      />
                     </div>
                   ))}
                 </div>
+
+                {/* Image upload */}
+                <div>
+                  <label className="block text-[11px] uppercase tracking-widest text-white/35 mb-1.5">
+                    Course Image
+                    <span className="ml-2 normal-case tracking-normal text-white/20">(optional)</span>
+                  </label>
+                  <label className="block cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="sr-only"
+                      onChange={handleFileChange}
+                    />
+                    {imagePreview ? (
+                      <div className="relative rounded-xl overflow-hidden h-32 border border-white/10 group">
+                        <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-xs text-white font-medium">Click to change</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-white/15 bg-white/3 h-24 flex flex-col items-center justify-center gap-1.5 hover:border-[#c9a84c]/40 hover:bg-[#c9a84c]/5 transition-all">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/25">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <span className="text-xs text-white/35">Click to upload</span>
+                        <span className="text-[10px] text-white/20">JPG, PNG, WEBP up to 5 MB</span>
+                      </div>
+                    )}
+                  </label>
+                  {fileError && <p className="text-xs text-red-400 mt-1.5">{fileError}</p>}
+                </div>
+
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={onClose}
                     className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-white/50 hover:text-white hover:border-white/20 transition-colors">
                     Cancel
                   </button>
-                  <button type="submit"
-                    className="flex-1 rounded-xl bg-[#c9a84c] py-2.5 text-sm font-bold text-black hover:bg-[#d4b86a] active:scale-95 transition-all">
-                    {editTarget ? "Save Changes" : "Add Course"}
+                  <button
+                    type="submit"
+                    disabled={!form.name.trim() || !form.city.trim() || !form.par || !form.rating || !form.slope || uploading || isDuplicate}
+                    className="flex-1 rounded-xl bg-[#c9a84c] py-2.5 text-sm font-bold text-black hover:bg-[#d4b86a] active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    {uploading ? "Uploading…" : editTarget ? "Save Changes" : "Add Course"}
                   </button>
                 </div>
               </form>
@@ -407,7 +520,7 @@ export default function CoursesPage() {
         </motion.div>
       </div>
 
-      <CourseModal isOpen={modalOpen} editTarget={editTarget} onClose={() => setModalOpen(false)} onSave={handleSave} />
+      <CourseModal isOpen={modalOpen} editTarget={editTarget} existingCourses={courses} onClose={() => setModalOpen(false)} onSave={handleSave} />
 
       <AnimatePresence>
         {deleteTarget && (

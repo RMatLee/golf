@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { CourseSearch } from "@/components/CourseSearch";
 import type { CourseRow } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -108,13 +109,17 @@ function StepRoundDetails({ form, onChange, onNext }: { form: RoundForm; onChang
 // ─── Step 2 — Course ──────────────────────────────────────────────────────────
 
 const EMPTY_NEW_COURSE: NewCourseForm = { name: "", city: "", par: "", rating: "", slope: "" };
+const MAX_FILE_SIZE  = 5 * 1024 * 1024;
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-function StepCourse({ courses, selectedId, newCourse, onSelectId, onNewCourse, onBack, onSubmit, submitting }: {
+function StepCourse({ courses, selectedId, newCourse, imageFile, onSelectId, onNewCourse, onImageFile, onBack, onSubmit, submitting }: {
   courses: Course[];
   selectedId: string;
   newCourse: NewCourseForm;
+  imageFile: File | null;
   onSelectId: (id: string) => void;
   onNewCourse: (f: NewCourseForm) => void;
+  onImageFile: (f: File | null) => void;
   onBack: () => void;
   onSubmit: () => void;
   submitting: boolean;
@@ -124,7 +129,11 @@ function StepCourse({ courses, selectedId, newCourse, onSelectId, onNewCourse, o
   return (
     <motion.form key="step2" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.25 }}
-      onSubmit={(e) => { e.preventDefault(); if (isNew && !newCourse.name.trim()) return; onSubmit(); }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (isNew && (!newCourse.name.trim() || !newCourse.city.trim() || !newCourse.par || !newCourse.rating || !newCourse.slope)) return;
+        onSubmit();
+      }}
       className="flex flex-col gap-5">
       <Field label="Course">
         <select value={selectedId} onChange={(e) => onSelectId(e.target.value)} className={selectCls} required>
@@ -141,37 +150,78 @@ function StepCourse({ courses, selectedId, newCourse, onSelectId, onNewCourse, o
             <div className="flex flex-col gap-4 pt-1 border-t border-white/8 mt-1">
               <p className="text-xs text-white/30 pt-3">Enter the details for the new course. It will be saved to your course list.</p>
               <Field label="Course Name">
-                <input type="text" placeholder="e.g. Whistling Straits" value={newCourse.name}
-                  onChange={(e) => onNewCourse({ ...newCourse, name: e.target.value })} className={inputCls} required={isNew} />
+                <CourseSearch
+                  value={newCourse.name}
+                  onChange={(v) => onNewCourse({ ...newCourse, name: v })}
+                  onSelect={({ name, city }) => onNewCourse({ ...newCourse, name, city })}
+                  required={isNew}
+                />
               </Field>
               <Field label="City / Location">
-                <input type="text" placeholder="e.g. Kohler, WI" value={newCourse.city}
-                  onChange={(e) => onNewCourse({ ...newCourse, city: e.target.value })} className={inputCls} required={isNew} />
+                <input
+                  type="text"
+                  placeholder="e.g. Kohler, WI"
+                  value={newCourse.city}
+                  onChange={(e) => onNewCourse({ ...newCourse, city: e.target.value })}
+                  className={inputCls}
+                  required={isNew}
+                />
               </Field>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { key: "par",    label: "Par",    placeholder: "72"   },
-                  { key: "rating", label: "Rating", placeholder: "71.5" },
-                  { key: "slope",  label: "Slope",  placeholder: "131"  },
+                  { key: "par",    label: "Par",    placeholder: "72",   min: "60",  max: "80",  step: "1"   },
+                  { key: "rating", label: "Rating", placeholder: "71.5", min: "50",  max: "80",  step: "0.1" },
+                  { key: "slope",  label: "Slope",  placeholder: "131",  min: "55",  max: "155", step: "1"   },
                 ].map((f) => (
                   <Field key={f.key} label={f.label}>
-                    <input type="text" placeholder={f.placeholder}
+                    <input
+                      type="number"
+                      placeholder={f.placeholder}
+                      min={f.min}
+                      max={f.max}
+                      step={f.step}
                       value={newCourse[f.key as keyof NewCourseForm]}
                       onChange={(e) => onNewCourse({ ...newCourse, [f.key]: e.target.value })}
-                      className={inputCls} required={isNew} />
+                      onKeyDown={(e) => { if (["e","E","+","-"].includes(e.key)) e.preventDefault(); }}
+                      className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                      required={isNew}
+                    />
                   </Field>
                 ))}
               </div>
-              {newCourse.name && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="rounded-xl border border-white/8 bg-white/3 px-4 py-3">
-                  <p className="text-[11px] text-white/30 leading-relaxed">
-                    Optionally add an image named{" "}
-                    <span className="font-mono text-[#c9a84c]/70">{toImageSlug(newCourse.name)}.jpg</span>{" "}
-                    to <span className="font-mono text-white/40">public/images/courses/</span>
-                  </p>
-                </motion.div>
-              )}
+              {/* Image upload */}
+              <Field label="Course Image" hint="optional · JPG, PNG, WEBP up to 5 MB">
+                <label className="block cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (!ACCEPTED_TYPES.includes(file.type) || file.size > MAX_FILE_SIZE) return;
+                      onImageFile(file);
+                    }}
+                  />
+                  {imageFile ? (
+                    <div className="relative rounded-xl overflow-hidden h-28 border border-white/10 group">
+                      <img src={URL.createObjectURL(imageFile)} alt="preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs text-white font-medium">Click to change</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-white/15 bg-white/3 h-20 flex flex-col items-center justify-center gap-1 hover:border-[#c9a84c]/40 hover:bg-[#c9a84c]/5 transition-all">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/25">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                      <span className="text-xs text-white/30">Click to upload</span>
+                    </div>
+                  )}
+                </label>
+              </Field>
             </div>
           </motion.div>
         )}
@@ -279,12 +329,13 @@ export default function LogRoundPage() {
     if (!authLoading && !session) router.replace("/login");
   }, [authLoading, session, router]);
 
-  const [courses, setCourses]       = useState<Course[]>([]);
-  const [step, setStep]             = useState<0 | 1 | 2>(0);
-  const [roundForm, setRoundForm]   = useState<RoundForm>(DEFAULT_ROUND);
-  const [selectedId, setSelectedId] = useState("");
-  const [newCourse, setNewCourse]   = useState<NewCourseForm>(EMPTY_NEW_COURSE);
-  const [submitting, setSubmitting] = useState(false);
+  const [courses, setCourses]         = useState<Course[]>([]);
+  const [step, setStep]               = useState<0 | 1 | 2>(0);
+  const [roundForm, setRoundForm]     = useState<RoundForm>(DEFAULT_ROUND);
+  const [selectedId, setSelectedId]   = useState("");
+  const [newCourse, setNewCourse]     = useState<NewCourseForm>(EMPTY_NEW_COURSE);
+  const [imageFile, setImageFile]     = useState<File | null>(null);
+  const [submitting, setSubmitting]   = useState(false);
   const [savedCourse, setSavedCourse] = useState<Course | null>(null);
 
   useEffect(() => {
@@ -298,13 +349,29 @@ export default function LogRoundPage() {
 
     // If adding a new course, insert it first
     if (selectedId === "new") {
+      // Upload image if one was selected
+      let image = toImageSlug(newCourse.name.trim());
+      if (imageFile) {
+        const ext      = imageFile.name.split(".").pop()?.toLowerCase() ?? "jpg";
+        const filePath = `${toImageSlug(newCourse.name.trim())}-${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("course-images")
+          .upload(filePath, imageFile, { upsert: true });
+        if (!uploadError && uploadData) {
+          const { data: { publicUrl } } = supabase.storage
+            .from("course-images")
+            .getPublicUrl(uploadData.path);
+          image = publicUrl;
+        }
+      }
+
       const { data: created } = await supabase.from("courses").insert({
         name:   newCourse.name.trim(),
         city:   newCourse.city.trim(),
         par:    Number(newCourse.par)    || 72,
         rating: Number(newCourse.rating) || 0,
         slope:  Number(newCourse.slope)  || 113,
-        image:  toImageSlug(newCourse.name.trim()),
+        image,
       }).select().single();
 
       if (created) {
@@ -336,6 +403,7 @@ export default function LogRoundPage() {
     setRoundForm(DEFAULT_ROUND);
     setSelectedId("");
     setNewCourse(EMPTY_NEW_COURSE);
+    setImageFile(null);
     setSavedCourse(null);
   }
 
@@ -366,8 +434,10 @@ export default function LogRoundPage() {
               courses={courses}
               selectedId={selectedId}
               newCourse={newCourse}
+              imageFile={imageFile}
               onSelectId={setSelectedId}
               onNewCourse={setNewCourse}
+              onImageFile={setImageFile}
               onBack={() => setStep(0)}
               onSubmit={handleSubmit}
               submitting={submitting}
