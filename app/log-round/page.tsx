@@ -447,16 +447,18 @@ export default function LogRoundPage() {
 
       const handicap = Math.round((score - rating) * 113 / slope * 10) / 10;
 
-      const { error: roundError } = await supabase.from("rounds").insert({
-        date:           roundForm.date,
-        course_id:      courseId,
+      const insertData: Record<string, unknown> = {
+        date:      roundForm.date,
+        course_id: courseId,
         score,
-        par:            parForRound,
-        holes:          holesPlayed,
-        putts:          Number(roundForm.putts),
+        par:       parForRound,
+        holes:     holesPlayed,
+        putts:     Number(roundForm.putts),
         handicap,
-        nine_hole_type: nineHoleType,
-      });
+      };
+      if (nineHoleType) insertData.nine_hole_type = nineHoleType;
+
+      const { error: roundError } = await supabase.from("rounds").insert(insertData);
 
       if (roundError) throw new Error("Failed to save round");
 

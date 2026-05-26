@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     // ── Cache miss — fetch from Supabase ───────────────────────────────────
     const [{ data: latestRound, error: e1 }, { count, error: e2 }, { data: recentData, error: e3 }] =
       await Promise.all([
-        supabase.from("rounds").select("score, handicap, courses(name)").order("date", { ascending: false }).limit(1),
+        supabase.from("rounds").select("score, holes, courses(name, rating, slope)").order("date", { ascending: false }).limit(1),
         supabase.from("rounds").select("*", { count: "exact", head: true }),
         supabase.from("rounds").select("id, date, score, par, holes, courses(name)").order("date", { ascending: false }).limit(3),
       ]);
@@ -44,10 +44,20 @@ export async function GET(req: NextRequest) {
 
     const latest = latestRound?.[0] as any;
 
+    let handicapStr = "—";
+    if (latest) {
+      const rating    = (latest.courses?.rating ?? null) as number | null;
+      const slope     = (latest.courses?.slope  ?? null) as number | null;
+      if (rating && slope) {
+        const adjRating = (latest.holes ?? 18) === 9 ? rating / 2 : rating;
+        handicapStr = String(Math.round((latest.score - adjRating) * 113 / slope * 10) / 10);
+      }
+    }
+
     const rawStats = {
       lastScore:    latest ? String(latest.score) : "—",
-      lastCourse:   latest?.courses?.name ?? "—",
-      handicap:     latest?.handicap != null ? String(latest.handicap) : "—",
+      lastCourse:   (latest as any)?.courses?.name ?? "—",
+      handicap:     handicapStr,
       roundsPlayed: count != null ? String(count) : "—",
     };
 

@@ -84,15 +84,18 @@ function ChartTooltip({ active, payload, label, unit = "", prefix = "" }: {
 
 // ─── Chart Card ───────────────────────────────────────────────────────────────
 
-function ChartCard({ title, subtitle, children, delay = 0 }: {
-  title: string; subtitle?: string; children: React.ReactNode; delay?: number;
+function ChartCard({ title, subtitle, note, children, delay = 0 }: {
+  title: string; subtitle?: string; note?: string; children: React.ReactNode; delay?: number;
 }) {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay }}
       className="rounded-2xl border border-white/8 bg-white/3 p-6">
       <div className="mb-5">
         <p className="text-[10px] uppercase tracking-[0.2em] text-[#c9a84c] font-semibold mb-0.5">{subtitle}</p>
-        <h3 className="text-base font-bold text-white">{title}</h3>
+        <div className="flex items-baseline gap-2">
+          <h3 className="text-base font-bold text-white">{title}</h3>
+          {note && <span className="text-[10px] text-white/25">{note}</span>}
+        </div>
       </div>
       {children}
     </motion.div>
@@ -143,16 +146,21 @@ export default function StatsPage() {
     ? (filtered[filtered.length - 1].handicap - filtered[0].handicap).toFixed(1)
     : null;
 
-  const chartData = filtered.map((r) => ({
-    date:     fmt(r.date),
-    score:    r.score,
-    toPar:    r.score - r.par,
-    putts:    r.putts,
-    handicap: r.handicap,
-    holes:    r.holes ?? 18,
-  }));
+  const has9H = filtered.some((r) => (r.holes ?? 18) === 9);
 
-  const puttRef = holesFilter === "9" ? 15 : 30;
+  const chartData = filtered.map((r) => {
+    const is9 = (r.holes ?? 18) === 9;
+    return {
+      date:     fmt(r.date),
+      score:    is9 ? r.score * 2 : r.score,
+      toPar:    r.score - r.par,
+      putts:    is9 ? r.putts * 2 : r.putts,
+      handicap: r.handicap,
+      holes:    r.holes ?? 18,
+    };
+  });
+
+  const puttRef = 30;
 
   const avgScoreNum = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
 
@@ -216,7 +224,7 @@ export default function StatsPage() {
         {!loading && !error && (
           <ErrorBoundary section="Charts">
           <div className="flex flex-col gap-5">
-            <ChartCard title="Score Trend" subtitle="Scoring" delay={0.2}>
+            <ChartCard title="Score Trend" subtitle="Scoring" note={has9H ? "9H rounds ×2" : undefined} delay={0.2}>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4" />
@@ -248,7 +256,7 @@ export default function StatsPage() {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="Putts Per Round" subtitle="Putting" delay={0.3}>
+            <ChartCard title="Putts Per Round" subtitle="Putting" note={has9H ? "9H rounds ×2" : undefined} delay={0.3}>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4" />

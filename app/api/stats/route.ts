@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     // ── Cache miss — fetch from Supabase ───────────────────────────────────
     const { data, error } = await supabase
       .from("rounds")
-      .select("id, date, score, par, holes, putts, handicap, courses(name)")
+      .select("id, date, score, par, holes, putts, courses(name, rating, slope)")
       .order("date", { ascending: true });
 
     if (error) {
@@ -35,16 +35,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch stats" }, { status: 502 });
     }
 
-    const mapped = (data ?? []).map((r: any) => ({
-      id:       r.id,
-      date:     r.date,
-      course:   r.courses?.name ?? "Unknown",
-      score:    r.score,
-      par:      r.par,
-      holes:    r.holes    ?? 18,
-      putts:    r.putts    ?? 0,
-      handicap: r.handicap ?? 0,
-    }));
+    const mapped = (data ?? []).map((r: any) => {
+      const rating    = (r.courses?.rating ?? 72) as number;
+      const slope     = (r.courses?.slope  ?? 113) as number;
+      const holes     = (r.holes ?? 18) as number;
+      const adjRating = holes === 9 ? rating / 2 : rating;
+      const handicap  = Math.round((r.score - adjRating) * 113 / slope * 10) / 10;
+      return {
+        id:       r.id,
+        date:     r.date,
+        course:   r.courses?.name ?? "Unknown",
+        score:    r.score,
+        par:      r.par,
+        holes:    holes === 9 ? 9 : 18,
+        putts:    r.putts ?? 0,
+        handicap,
+      };
+    });
 
     const parsed = statRoundSchema.array().safeParse(mapped);
     if (!parsed.success) {
