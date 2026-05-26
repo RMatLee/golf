@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { CourseSearch } from "@/components/CourseSearch";
@@ -20,7 +19,11 @@ function toImageSlug(name: string) {
   return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-const EMPTY_FORM = { name: "", city: "", par: "", rating: "", slope: "" };
+const EMPTY_FORM = {
+  name: "", city: "", par: "", rating: "", slope: "",
+  front_par: "", front_rating: "", front_slope: "",
+  back_par: "",  back_rating: "",  back_slope: "",
+};
 
 // ─── Per-course derived stats ─────────────────────────────────────────────────
 
@@ -45,11 +48,12 @@ function useCourseStats(courses: Course[], rounds: Round[]) {
 
 function courseImageSrc(image: string): string {
   if (!image) return "";
-  return image.startsWith("http") ? image : `/images/courses/${image}.jpg`;
+  return image.startsWith("http") ? image : "";
 }
 
 function CourseCard({ course, index }: { course: Course; index: number }) {
   const [imgError, setImgError] = useState(false);
+  const imgSrc = course.image ? courseImageSrc(course.image) : "";
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -58,13 +62,12 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
       className="relative overflow-hidden rounded-2xl border border-white/8 hover:border-[#c9a84c]/40 transition-all duration-300 group cursor-default"
       style={{ height: "220px" }}
     >
-      {!imgError && course.image ? (
-        <Image
-          src={courseImageSrc(course.image)}
+      {!imgError && imgSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imgSrc}
           alt={course.name}
-          fill
-          sizes="(max-width: 768px) 100vw, 33vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={() => setImgError(true)}
         />
       ) : (
@@ -102,12 +105,13 @@ function CourseModal({
   onClose: () => void;
   onSave: (data: Omit<Course, "id" | "created_at">, id?: string) => void;
 }) {
-  const [form, setForm]             = useState(EMPTY_FORM);
-  const [imageFile, setImageFile]   = useState<File | null>(null);
+  const [form, setForm]                 = useState(EMPTY_FORM);
+  const [show9Hole, setShow9Hole]       = useState(false);
+  const [imageFile, setImageFile]       = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
-  const [uploading, setUploading]   = useState(false);
-  const [fileError, setFileError]   = useState("");
-  const [lastKey, setLastKey]       = useState<string | null>(null);
+  const [uploading, setUploading]       = useState(false);
+  const [fileError, setFileError]       = useState("");
+  const [lastKey, setLastKey]           = useState<string | null>(null);
   const key = editTarget?.id ?? "new";
 
   // True when the typed name matches an existing course (excluding the one being edited)
@@ -117,9 +121,20 @@ function CourseModal({
 
   if (key !== lastKey) {
     setLastKey(key);
+    const has9Hole = !!(editTarget?.front_par || editTarget?.front_rating || editTarget?.front_slope || editTarget?.back_par || editTarget?.back_rating || editTarget?.back_slope);
+    setShow9Hole(has9Hole);
     setForm(
       editTarget
-        ? { name: editTarget.name, city: editTarget.city, par: String(editTarget.par), rating: String(editTarget.rating), slope: String(editTarget.slope) }
+        ? {
+            name: editTarget.name, city: editTarget.city,
+            par: String(editTarget.par), rating: String(editTarget.rating), slope: String(editTarget.slope),
+            front_par:    editTarget.front_par    != null ? String(editTarget.front_par)    : "",
+            front_rating: editTarget.front_rating != null ? String(editTarget.front_rating) : "",
+            front_slope:  editTarget.front_slope  != null ? String(editTarget.front_slope)  : "",
+            back_par:     editTarget.back_par     != null ? String(editTarget.back_par)     : "",
+            back_rating:  editTarget.back_rating  != null ? String(editTarget.back_rating)  : "",
+            back_slope:   editTarget.back_slope   != null ? String(editTarget.back_slope)   : "",
+          }
         : EMPTY_FORM
     );
     setImageFile(null);
@@ -154,15 +169,19 @@ function CourseModal({
       const ext      = imageFile.name.split(".").pop()?.toLowerCase() ?? "jpg";
       const filePath = `${toImageSlug(form.name.trim())}-${Date.now()}.${ext}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("course-images")
+        .from("courses-images")
         .upload(filePath, imageFile, { upsert: true });
 
-      if (!uploadError && uploadData) {
-        const { data: { publicUrl } } = supabase.storage
-          .from("course-images")
-          .getPublicUrl(uploadData.path);
-        image = publicUrl;
+      if (uploadError) {
+        setUploading(false);
+        toast.error(`Image upload failed: ${uploadError.message}`);
+        return;
       }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("courses-images")
+        .getPublicUrl(uploadData.path);
+      image = publicUrl;
     }
 
     setUploading(false);
@@ -174,6 +193,12 @@ function CourseModal({
         rating: Number(form.rating) || 0,
         slope:  Number(form.slope)  || 113,
         image,
+        front_par:    form.front_par    ? Number(form.front_par)    : null,
+        front_rating: form.front_rating ? Number(form.front_rating) : null,
+        front_slope:  form.front_slope  ? Number(form.front_slope)  : null,
+        back_par:     form.back_par     ? Number(form.back_par)     : null,
+        back_rating:  form.back_rating  ? Number(form.back_rating)  : null,
+        back_slope:   form.back_slope   ? Number(form.back_slope)   : null,
       },
       editTarget?.id
     );
@@ -246,6 +271,54 @@ function CourseModal({
                       />
                     </div>
                   ))}
+                </div>
+
+                {/* 9-Hole Details */}
+                <div>
+                  <button type="button" onClick={() => setShow9Hole((v) => !v)}
+                    className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-white/35 hover:text-white/60 transition-colors">
+                    <span>9-Hole Details</span>
+                    <span className="text-white/20 normal-case tracking-normal">(optional)</span>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"
+                      className={`transition-transform ${show9Hole ? "rotate-180" : ""}`}>
+                      <path d="M5 7L1 3h8L5 7z"/>
+                    </svg>
+                  </button>
+                  <AnimatePresence>
+                    {show9Hole && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                        <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-white/8">
+                          {[
+                            { prefix: "front", label: "Front 9" },
+                            { prefix: "back",  label: "Back 9"  },
+                          ].map(({ prefix, label }) => (
+                            <div key={prefix}>
+                              <p className="text-[10px] uppercase tracking-widest text-white/25 mb-2">{label}</p>
+                              <div className="flex flex-col gap-2">
+                                {[
+                                  { key: `${prefix}_par`,    label: "Par",    placeholder: "36",   min: "27", max: "45", step: "1"   },
+                                  { key: `${prefix}_rating`, label: "Rating", placeholder: "35.5", min: "25", max: "45", step: "0.1" },
+                                  { key: `${prefix}_slope`,  label: "Slope",  placeholder: "121",  min: "55", max: "155", step: "1"   },
+                                ].map((f) => (
+                                  <div key={f.key}>
+                                    <label className="block text-[10px] text-white/25 mb-1">{f.label}</label>
+                                    <input
+                                      type="number" placeholder={f.placeholder} min={f.min} max={f.max} step={f.step}
+                                      value={form[f.key as keyof typeof EMPTY_FORM]}
+                                      onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                                      onKeyDown={(e) => ["e","E","+","-"].includes(e.key) && e.preventDefault()}
+                                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Image upload */}

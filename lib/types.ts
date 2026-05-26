@@ -8,6 +8,12 @@ export interface CourseRow {
   rating: number;
   slope: number;
   image: string;
+  front_par:    number | null;
+  front_rating: number | null;
+  front_slope:  number | null;
+  back_par:     number | null;
+  back_rating:  number | null;
+  back_slope:   number | null;
   created_at: string;
 }
 

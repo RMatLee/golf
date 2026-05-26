@@ -55,9 +55,14 @@ function RecentCard({ round, index, isAdmin, onEdit, onDelete }: {
           <p className="text-[10px] uppercase tracking-[0.2em] text-white/30 font-semibold mb-1">{fmtDate(round.date)}</p>
           <h3 className="text-base font-bold text-white leading-tight">{round.course}</h3>
         </div>
-        <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${toParBadgeBg(diff)}`}>
-          {diff === 0 ? "Even" : diff > 0 ? `+${diff} over` : `${Math.abs(diff)} under`}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border border-white/10 text-white/30">
+            {round.holes ?? 18}H
+          </span>
+          <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${toParBadgeBg(diff)}`}>
+            {diff === 0 ? "Even" : diff > 0 ? `+${diff} over` : `${Math.abs(diff)} under`}
+          </span>
+        </div>
       </div>
       <div className="flex items-end gap-3">
         <span className="text-5xl font-black tracking-tighter text-white">{round.score}</span>
@@ -91,36 +96,96 @@ function RecentCard({ round, index, isAdmin, onEdit, onDelete }: {
 
 // ─── Edit Modal ───────────────────────────────────────────────────────────────
 
+type Course9H = {
+  par: number;
+  rating: number;
+  slope: number;
+  front_par: number | null;
+  front_rating: number | null;
+  front_slope: number | null;
+  back_par: number | null;
+  back_rating: number | null;
+  back_slope: number | null;
+};
+
+function calcDifferential(score: number, rating: number, slope: number) {
+  return Math.round((score - rating) * 113 / slope * 10) / 10;
+}
+
 function EditModal({ round, onClose, onSaved }: {
   round: Round;
   onClose: () => void;
-  onSaved: (updated: { id: string; date: string; score: number }) => void;
+  onSaved: (updated: { id: string; date: string; score: number; par: number; holes: number }) => void;
 }) {
-  const [form, setForm]       = useState({ date: round.date, score: String(round.score), putts: "" });
+  const [form, setForm]         = useState({
+    date: round.date, score: String(round.score), putts: "",
+    holes: "18" as "9" | "18", nineHoleType: "" as "front" | "back" | "",
+  });
+  const [course9H, setCourse9H] = useState<Course9H | null>(null);
   const [fetching, setFetching] = useState(true);
-  const [saving, setSaving]   = useState(false);
+  const [saving, setSaving]     = useState(false);
 
   useEffect(() => {
-    supabase.from("rounds").select("putts").eq("id", round.id).single()
+    supabase.from("rounds")
+      .select("putts, holes, nine_hole_type, courses(par, rating, slope, front_par, front_rating, front_slope, back_par, back_rating, back_slope)")
+      .eq("id", round.id).single()
       .then(({ data }) => {
-        setForm((f) => ({ ...f, putts: String(data?.putts ?? "") }));
+        if (data?.courses) setCourse9H(data.courses as unknown as Course9H);
+        setForm((f) => ({
+          ...f,
+          putts:        String(data?.putts ?? ""),
+          holes:        String(data?.holes ?? 18) as "9" | "18",
+          nineHoleType: (data?.nine_hole_type as "front" | "back") || "",
+        }));
         setFetching(false);
       });
   }, [round.id]);
 
+  const has9HData = !!(course9H?.front_rating || course9H?.back_rating || course9H?.front_par || course9H?.back_par);
+
+  function derivePar(): number {
+    if (!course9H) return round.par;
+    if (form.holes === "9") {
+      if (form.nineHoleType === "front") return course9H.front_par ?? Math.round(course9H.par / 2);
+      if (form.nineHoleType === "back")  return course9H.back_par  ?? Math.round(course9H.par / 2);
+      return Math.round(course9H.par / 2);
+    }
+    return course9H.par;
+  }
+
+  function deriveHandicap(): number | null {
+    if (!course9H) return null;
+    const score = Number(form.score);
+    if (form.holes === "9") {
+      if (form.nineHoleType === "front" && course9H.front_rating && course9H.front_slope)
+        return calcDifferential(score, course9H.front_rating, course9H.front_slope);
+      if (form.nineHoleType === "back"  && course9H.back_rating  && course9H.back_slope)
+        return calcDifferential(score, course9H.back_rating, course9H.back_slope);
+      return calcDifferential(score, course9H.rating / 2, course9H.slope);
+    }
+    return calcDifferential(score, course9H.rating, course9H.slope);
+  }
+
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
+    const par      = derivePar();
+    const handicap = deriveHandicap();
     try {
-      const { error } = await supabase.from("rounds").update({
-        date:  form.date,
-        score: Number(form.score),
-        putts: Number(form.putts) || 0,
-      }).eq("id", round.id);
+      const payload: Record<string, unknown> = {
+        date:           form.date,
+        score:          Number(form.score),
+        putts:          Number(form.putts) || 0,
+        holes:          Number(form.holes),
+        par,
+        nine_hole_type: form.nineHoleType || null,
+      };
+      if (handicap !== null) payload.handicap = handicap;
+      const { error } = await supabase.from("rounds").update(payload).eq("id", round.id);
       if (error) throw error;
       await fetch("/api/cache/invalidate", { method: "POST" });
       toast.success("Round updated");
-      onSaved({ id: round.id, date: form.date, score: Number(form.score) });
+      onSaved({ id: round.id, date: form.date, score: Number(form.score), par, holes: Number(form.holes) });
     } catch {
       toast.error("Failed to update round");
       setSaving(false);
@@ -143,6 +208,41 @@ function EditModal({ round, onClose, onSaved }: {
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
+              <label className="block text-[11px] uppercase tracking-widest text-white/35 mb-1.5">Holes</label>
+              <div className="flex gap-2">
+                {(["9", "18"] as const).map((h) => (
+                  <button key={h} type="button"
+                    onClick={() => setForm({ ...form, holes: h, nineHoleType: h === "18" ? "" : form.nineHoleType })}
+                    className={`flex-1 rounded-xl border py-2.5 text-sm font-bold transition-all ${
+                      form.holes === h
+                        ? "border-[#c9a84c] bg-[#c9a84c]/10 text-[#c9a84c]"
+                        : "border-white/10 bg-white/5 text-white/40 hover:text-white hover:border-white/20"
+                    }`}>
+                    {h}H
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {form.holes === "9" && has9HData && (
+              <div>
+                <label className="block text-[11px] uppercase tracking-widest text-white/35 mb-1.5">Which 9?</label>
+                <div className="flex gap-2">
+                  {(["front", "back"] as const).map((side) => (
+                    <button key={side} type="button" onClick={() => setForm({ ...form, nineHoleType: side })}
+                      className={`flex-1 rounded-xl border py-2.5 text-sm font-bold capitalize transition-all ${
+                        form.nineHoleType === side
+                          ? "border-[#c9a84c] bg-[#c9a84c]/10 text-[#c9a84c]"
+                          : "border-white/10 bg-white/5 text-white/40 hover:text-white hover:border-white/20"
+                      }`}>
+                      {side} 9
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
               <label className="block text-[11px] uppercase tracking-widest text-white/35 mb-1.5">Date</label>
               <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
                 className={inputCls} required />
@@ -150,7 +250,7 @@ function EditModal({ round, onClose, onSaved }: {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] uppercase tracking-widest text-white/35 mb-1.5">Score</label>
-                <input type="number" min={30} max={200} value={form.score}
+                <input type="number" min={15} max={200} value={form.score}
                   onChange={(e) => setForm({ ...form, score: e.target.value })}
                   onKeyDown={(e) => ["e","E","+","-"].includes(e.key) && e.preventDefault()}
                   className={`${inputCls} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
@@ -289,7 +389,7 @@ export default function RoundsPage() {
     return result;
   }, [rounds, search, course, sort]);
 
-  function handleSaved(updated: { id: string; date: string; score: number }) {
+  function handleSaved(updated: { id: string; date: string; score: number; par: number; holes: number }) {
     setRounds((prev) => prev.map((r) => r.id === updated.id ? { ...r, ...updated } : r));
     setEditTarget(null);
   }
@@ -390,7 +490,10 @@ export default function RoundsPage() {
                       transition={{ duration: 0.15, delay: i * 0.02 }}
                       className={`grid ${adminColClass} gap-4 px-5 py-3.5 border-b border-white/4 last:border-0 hover:bg-white/3 transition-colors group`}
                     >
-                      <span className="text-xs text-white/40 font-mono tabular-nums self-center">{fmtDate(round.date)}</span>
+                      <span className="text-xs text-white/40 font-mono tabular-nums self-center">
+                        {fmtDate(round.date)}
+                        <span className="ml-1.5 text-[10px] border border-white/10 rounded px-1 py-0.5 text-white/25">{round.holes ?? 18}H</span>
+                      </span>
                       <span className="text-sm text-white font-medium self-center truncate">{round.course}</span>
                       <span className="text-sm font-bold text-white tabular-nums self-center text-right">{round.score}</span>
                       <span className={`text-sm font-bold tabular-nums self-center text-right ${color}`}>{label}</span>

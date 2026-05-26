@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     // ── Cache miss — fetch from Supabase ───────────────────────────────────
     const { data, error } = await supabase
       .from("rounds")
-      .select("id, date, score, par, putts, handicap, courses(name)")
+      .select("id, date, score, par, holes, putts, handicap, courses(name)")
       .order("date", { ascending: true });
 
     if (error) {
@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
       course:   r.courses?.name ?? "Unknown",
       score:    r.score,
       par:      r.par,
+      holes:    r.holes    ?? 18,
       putts:    r.putts    ?? 0,
       handicap: r.handicap ?? 0,
     }));

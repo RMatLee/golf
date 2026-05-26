@@ -115,7 +115,10 @@ export default function Home() {
                   <motion.div key={round.id} initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.15 }}
                     className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#c9a84c]/50 transition-colors">
-                    <p className="text-white/30 text-xs uppercase tracking-widest mb-1">{date}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-white/30 text-xs uppercase tracking-widest">{date}</p>
+                      <span className="text-[10px] border border-white/10 rounded px-1.5 py-0.5 text-white/25">{round.holes ?? 18}H</span>
+                    </div>
                     <p className="text-white font-semibold mb-3">{round.course}</p>
                     <div className="flex items-end gap-2">
                       <span className="text-4xl font-black text-white">{round.score}</span>

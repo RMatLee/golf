@@ -14,8 +14,9 @@ export const roundItemSchema = z.object({
   id:     z.string(),
   date:   z.string(),
   course: z.string(),
-  score:  z.number().int().min(30).max(200),
-  par:    z.number().int().min(60).max(80),
+  score:  z.number().int().min(15).max(200),
+  par:    z.number().int().min(27).max(80),
+  holes:  z.union([z.literal(9), z.literal(18)]),
 });
 
 export const statRoundSchema = roundItemSchema.extend({

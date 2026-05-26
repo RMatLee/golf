@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       await Promise.all([
         supabase.from("rounds").select("score, handicap, courses(name)").order("date", { ascending: false }).limit(1),
         supabase.from("rounds").select("*", { count: "exact", head: true }),
-        supabase.from("rounds").select("id, date, score, par, courses(name)").order("date", { ascending: false }).limit(3),
+        supabase.from("rounds").select("id, date, score, par, holes, courses(name)").order("date", { ascending: false }).limit(3),
       ]);
 
     if (e1 || e2 || e3) {
@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
       date:   r.date,
       score:  r.score,
       par:    r.par,
+      holes:  r.holes ?? 18,
       course: r.courses?.name ?? "Unknown",
     }));
 

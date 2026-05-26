@@ -13,7 +13,7 @@ import type { CourseRow } from "@/lib/types";
 
 type Course = CourseRow;
 
-interface RoundForm { date: string; score: string; putts: string; }
+interface RoundForm { date: string; score: string; putts: string; holes: "9" | "18"; nineHoleType: "front" | "back" | ""; }
 interface NewCourseForm { name: string; city: string; par: string; rating: string; slope: string; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -85,17 +85,31 @@ function StepRoundDetails({ form, onChange, onNext }: { form: RoundForm; onChang
     <motion.form key="step1" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.25 }}
       onSubmit={(e) => { e.preventDefault(); onNext(); }} className="flex flex-col gap-5">
+      <Field label="Holes Played">
+        <div className="flex gap-2">
+          {(["9", "18"] as const).map((h) => (
+            <button key={h} type="button" onClick={() => onChange({ ...form, holes: h })}
+              className={`flex-1 rounded-xl border py-3 text-sm font-bold transition-all ${
+                form.holes === h
+                  ? "border-[#c9a84c] bg-[#c9a84c]/10 text-[#c9a84c]"
+                  : "border-white/10 bg-white/5 text-white/40 hover:text-white hover:border-white/20"
+              }`}>
+              {h} Holes
+            </button>
+          ))}
+        </div>
+      </Field>
       <Field label="Date">
         <input type="date" value={form.date} onChange={(e) => onChange({ ...form, date: e.target.value })}
           className={inputCls} required />
       </Field>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Score" hint="Total strokes">
-          <input type="number" placeholder="e.g. 84" value={form.score} min={30} max={200}
+          <input type="number" placeholder={form.holes === "9" ? "e.g. 42" : "e.g. 84"} value={form.score} min={15} max={200}
             onChange={(e) => onChange({ ...form, score: e.target.value })} className={inputCls} required />
         </Field>
         <Field label="Putts" hint="Total putts">
-          <input type="number" placeholder="e.g. 30" value={form.putts} min={10} max={80}
+          <input type="number" placeholder={form.holes === "9" ? "e.g. 15" : "e.g. 30"} value={form.putts} min={5} max={80}
             onChange={(e) => onChange({ ...form, putts: e.target.value })} className={inputCls} required />
         </Field>
       </div>
@@ -113,19 +127,24 @@ const EMPTY_NEW_COURSE: NewCourseForm = { name: "", city: "", par: "", rating: "
 const MAX_FILE_SIZE  = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-function StepCourse({ courses, selectedId, newCourse, imageFile, onSelectId, onNewCourse, onImageFile, onBack, onSubmit, submitting }: {
+function StepCourse({ courses, selectedId, newCourse, imageFile, holes, nineHoleType, onSelectId, onNewCourse, onImageFile, onNineHoleType, onBack, onSubmit, submitting }: {
   courses: Course[];
   selectedId: string;
   newCourse: NewCourseForm;
   imageFile: File | null;
+  holes: "9" | "18";
+  nineHoleType: "front" | "back" | "";
   onSelectId: (id: string) => void;
   onNewCourse: (f: NewCourseForm) => void;
   onImageFile: (f: File | null) => void;
+  onNineHoleType: (t: "front" | "back" | "") => void;
   onBack: () => void;
   onSubmit: () => void;
   submitting: boolean;
 }) {
   const isNew = selectedId === "new";
+  const selectedCourse = courses.find((c) => c.id === selectedId);
+  const has9HData = !!(selectedCourse?.front_rating || selectedCourse?.back_rating || selectedCourse?.front_par || selectedCourse?.back_par);
 
   return (
     <motion.form key="step2" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
@@ -137,12 +156,29 @@ function StepCourse({ courses, selectedId, newCourse, imageFile, onSelectId, onN
       }}
       className="flex flex-col gap-5">
       <Field label="Course">
-        <select value={selectedId} onChange={(e) => onSelectId(e.target.value)} className={selectCls} required>
+        <select value={selectedId} onChange={(e) => { onSelectId(e.target.value); onNineHoleType(""); }} className={selectCls} required>
           <option value="" disabled>Select a course...</option>
           {courses.map((c) => <option key={c.id} value={c.id}>{c.name} — {c.city}</option>)}
           <option value="new">+ Add a new course</option>
         </select>
       </Field>
+
+      {holes === "9" && has9HData && (
+        <Field label="Which 9?">
+          <div className="flex gap-2">
+            {(["front", "back"] as const).map((side) => (
+              <button key={side} type="button" onClick={() => onNineHoleType(side)}
+                className={`flex-1 rounded-xl border py-3 text-sm font-bold capitalize transition-all ${
+                  nineHoleType === side
+                    ? "border-[#c9a84c] bg-[#c9a84c]/10 text-[#c9a84c]"
+                    : "border-white/10 bg-white/5 text-white/40 hover:text-white hover:border-white/20"
+                }`}>
+                {side} 9
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
 
       <AnimatePresence>
         {isNew && (
@@ -319,7 +355,7 @@ function StepSuccess({ score, par, putts, courseName, date, onLogAnother, onHome
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const TODAY = new Date().toISOString().split("T")[0];
-const DEFAULT_ROUND: RoundForm = { date: TODAY, score: "", putts: "" };
+const DEFAULT_ROUND: RoundForm = { date: TODAY, score: "", putts: "", holes: "18", nineHoleType: "" };
 
 export default function LogRoundPage() {
   const router = useRouter();
@@ -356,11 +392,11 @@ export default function LogRoundPage() {
           const ext      = imageFile.name.split(".").pop()?.toLowerCase() ?? "jpg";
           const filePath = `${toImageSlug(newCourse.name.trim())}-${Date.now()}.${ext}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
-            .from("course-images")
+            .from("courses-images")
             .upload(filePath, imageFile, { upsert: true });
           if (!uploadError && uploadData) {
             const { data: { publicUrl } } = supabase.storage
-              .from("course-images")
+              .from("courses-images")
               .getPublicUrl(uploadData.path);
             image = publicUrl;
           }
@@ -383,12 +419,43 @@ export default function LogRoundPage() {
         }
       }
 
+      const coursePar   = resolved?.par ?? 72;
+      const courseRating = resolved?.rating ?? 72;
+      const courseSlope  = resolved?.slope ?? 113;
+      const holesPlayed  = Number(roundForm.holes) as 9 | 18;
+      const score        = Number(roundForm.score);
+
+      let parForRound = holesPlayed === 9 ? Math.round(coursePar / 2) : coursePar;
+      let nineHoleType: string | null = null;
+      let rating = courseRating;
+      let slope  = courseSlope;
+
+      if (holesPlayed === 9 && roundForm.nineHoleType) {
+        nineHoleType = roundForm.nineHoleType;
+        if (roundForm.nineHoleType === "front") {
+          parForRound = resolved?.front_par    ?? Math.round(coursePar / 2);
+          rating      = resolved?.front_rating ?? courseRating / 2;
+          slope       = resolved?.front_slope  ?? courseSlope;
+        } else {
+          parForRound = resolved?.back_par    ?? Math.round(coursePar / 2);
+          rating      = resolved?.back_rating ?? courseRating / 2;
+          slope       = resolved?.back_slope  ?? courseSlope;
+        }
+      } else if (holesPlayed === 9) {
+        rating = courseRating / 2;
+      }
+
+      const handicap = Math.round((score - rating) * 113 / slope * 10) / 10;
+
       const { error: roundError } = await supabase.from("rounds").insert({
-        date:      roundForm.date,
-        course_id: courseId,
-        score:     Number(roundForm.score),
-        par:       resolved?.par ?? 72,
-        putts:     Number(roundForm.putts),
+        date:           roundForm.date,
+        course_id:      courseId,
+        score,
+        par:            parForRound,
+        holes:          holesPlayed,
+        putts:          Number(roundForm.putts),
+        handicap,
+        nine_hole_type: nineHoleType,
       });
 
       if (roundError) throw new Error("Failed to save round");
@@ -442,9 +509,12 @@ export default function LogRoundPage() {
               selectedId={selectedId}
               newCourse={newCourse}
               imageFile={imageFile}
+              holes={roundForm.holes}
+              nineHoleType={roundForm.nineHoleType}
               onSelectId={setSelectedId}
               onNewCourse={setNewCourse}
               onImageFile={setImageFile}
+              onNineHoleType={(t) => setRoundForm((f) => ({ ...f, nineHoleType: t }))}
               onBack={() => setStep(0)}
               onSubmit={handleSubmit}
               submitting={submitting}

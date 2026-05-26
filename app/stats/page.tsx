@@ -16,6 +16,7 @@ type Round = StatRound;
 // ─── Filter Config ────────────────────────────────────────────────────────────
 
 type RoundFilter = "last5" | "last10" | "last20" | "30d" | "90d" | "thisYear";
+type HolesFilter = "all" | "9" | "18";
 
 const ROUND_FILTERS: { key: RoundFilter; label: string }[] = [
   { key: "last5",    label: "Last 5"    },
@@ -24,6 +25,12 @@ const ROUND_FILTERS: { key: RoundFilter; label: string }[] = [
   { key: "30d",      label: "30 Days"   },
   { key: "90d",      label: "90 Days"   },
   { key: "thisYear", label: "This Year" },
+];
+
+const HOLES_FILTERS: { key: HolesFilter; label: string }[] = [
+  { key: "all", label: "All"  },
+  { key: "18",  label: "18H"  },
+  { key: "9",   label: "9H"   },
 ];
 
 function applyFilter(rounds: Round[], filter: RoundFilter): Round[] {
@@ -95,10 +102,11 @@ function ChartCard({ title, subtitle, children, delay = 0 }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
-  const [allRounds, setAllRounds] = useState<Round[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(false);
-  const [filter, setFilter]       = useState<RoundFilter>("last10");
+  const [allRounds, setAllRounds]     = useState<Round[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(false);
+  const [filter, setFilter]           = useState<RoundFilter>("last10");
+  const [holesFilter, setHolesFilter] = useState<HolesFilter>("all");
 
   useEffect(() => {
     fetch("/api/stats")
@@ -117,7 +125,12 @@ export default function StatsPage() {
       });
   }, []);
 
-  const filtered = useMemo(() => applyFilter(allRounds, filter), [allRounds, filter]);
+  const filtered = useMemo(() => {
+    const byTime = applyFilter(allRounds, filter);
+    if (holesFilter === "all") return byTime;
+    const h = Number(holesFilter) as 9 | 18;
+    return byTime.filter((r) => (r.holes ?? 18) === h);
+  }, [allRounds, filter, holesFilter]);
 
   const scores    = filtered.map((r) => r.score);
   const putts     = filtered.map((r) => r.putts);
@@ -136,7 +149,10 @@ export default function StatsPage() {
     toPar:    r.score - r.par,
     putts:    r.putts,
     handicap: r.handicap,
+    holes:    r.holes ?? 18,
   }));
+
+  const puttRef = holesFilter === "9" ? 15 : 30;
 
   const avgScoreNum = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
 
@@ -155,14 +171,25 @@ export default function StatsPage() {
 
         {/* Filter pills */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.1 }}
-          className="flex flex-wrap gap-2 mb-8">
-          {ROUND_FILTERS.map((f) => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
-                filter === f.key ? "bg-[#c9a84c] text-black" : "border border-white/10 text-white/40 hover:text-white hover:border-white/20"}`}>
-              {f.label}
-            </button>
-          ))}
+          className="flex flex-col gap-2 mb-8">
+          <div className="flex flex-wrap gap-2">
+            {ROUND_FILTERS.map((f) => (
+              <button key={f.key} onClick={() => setFilter(f.key)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+                  filter === f.key ? "bg-[#c9a84c] text-black" : "border border-white/10 text-white/40 hover:text-white hover:border-white/20"}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {HOLES_FILTERS.map((f) => (
+              <button key={f.key} onClick={() => setHolesFilter(f.key)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+                  holesFilter === f.key ? "bg-white/15 text-white border border-white/30" : "border border-white/10 text-white/40 hover:text-white hover:border-white/20"}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
         </motion.div>
 
         {/* Stat cards */}
@@ -227,8 +254,8 @@ export default function StatsPage() {
                   <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4" />
                   <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis domain={["auto", "auto"]} tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <ReferenceLine y={30} stroke="rgba(201,168,76,0.25)" strokeDasharray="4 4"
-                    label={{ value: "30 putts", fill: "rgba(201,168,76,0.4)", fontSize: 10, position: "insideTopRight" }} />
+                  <ReferenceLine y={puttRef} stroke="rgba(201,168,76,0.25)" strokeDasharray="4 4"
+                    label={{ value: `${puttRef} putts`, fill: "rgba(201,168,76,0.4)", fontSize: 10, position: "insideTopRight" }} />
                   <Tooltip content={<ChartTooltip unit=" putts" />} />
                   <Line type="monotone" dataKey="putts" stroke="#a78bfa" strokeWidth={2}
                     dot={{ r: 3, fill: "#a78bfa", strokeWidth: 0 }} activeDot={{ r: 5, fill: "#a78bfa", strokeWidth: 0 }} />
