@@ -2,29 +2,58 @@
 
 Displays recently-played course cards and a full CRUD table of all courses.
 
-## Data Shapes
-```ts
-interface Course { id: string; name: string; city: string; par: number; rating: number; slope: number; image: string; }
-interface Round  { id: string; date: string; courseId: string; score: number; }
-```
-`image` is a slug string (e.g. `"whitnall-park"`). Image file: `public/images/courses/{image}.jpg`.
+## Data Source
+On mount, fetches courses from Supabase `courses` table and rounds from `rounds` table (for stats/recent logic). No API route intermediary — reads directly from Supabase with the anon key (RLS allows public SELECT).
 
-`SEED_COURSES` — 5 Milwaukee-area courses. `SEED_ROUNDS` — 20 rounds (read-only in this page).
+```ts
+// Matches CourseRow in lib/types.ts
+interface Course {
+  id: string; name: string; city: string;
+  par: number; rating: number; slope: number;
+  image: string | null;   // Supabase Storage URL or slug string
+}
+interface Round { id: string; date: string; course_id: string; score: number; }
+```
 
 ## State
-- `courses` — mutable; add/edit/delete via modal
-- `rounds` — read-only seed; used only for deriving stats and recently-played order
-- `search`, `modalOpen`, `editTarget`, `deleteTarget`
+- `courses` / `rounds` — fetched from Supabase on mount
+- `search`, `modalOpen`, `editTarget: Course | null`, `deleteTarget: Course | null`
+
+## Auth
+```ts
+const { session } = useAuth();
+const isAdmin = session !== null;
+```
+Add/Edit/Delete buttons only render when `isAdmin`. All writes go directly to Supabase (authenticated user's token; RLS rejects unauthenticated writes).
 
 ## Key Logic
-- `useCourseStats(courses, rounds)` — memoized, returns `{ course, timesPlayed, bestScore, lastPlayed }` per course
+- `useCourseStats(courses, rounds)` — memoized; returns `{ course, timesPlayed, bestScore, lastPlayed }` per course
 - `recentCourses` — 3 most recently played (deduped by courseId, iterating rounds sorted newest-first)
-- `tableRows` — `stats` filtered by `search` matching name or city
+- `tableRows` — stats filtered by `search` matching name or city
+- `isDuplicate(name)` — case-insensitive check against existing course names; prevents duplicate adds
 
-## CRUD
-- **Add/Edit**: `CourseModal` — controlled form, `editTarget=null` for add, `editTarget=Course` for edit. On save calls `handleSave(data, id?)`.
-- **Delete**: `DeleteConfirm` — separate modal overlay. Past rounds are not affected.
-- `toImageSlug(name)` → image filename hint shown in the add-course modal
+## CRUD & Toasts
+- **Add/Edit**: `CourseModal` — `editTarget=null` for add, `editTarget=Course` for edit. `handleSave` calls Supabase `insert` or `update`, then `toast.success` / `toast.error`.
+- **Delete**: `DeleteConfirm` modal — `handleDelete` calls Supabase `delete`, then `toast.success` / `toast.error`.
+- **Image upload**: On save with an image file, uploads to `course-images` bucket. Returns public URL stored in `image` column. Max 5 MB; accepted: `image/jpeg`, `image/png`, `image/webp`, `image/gif`.
+
+## Image Rendering
+```ts
+function courseImageSrc(image: string | null): string | null {
+  // Returns full URL if already a URL, otherwise null (no local slug fallback)
+}
+```
+`<Image fill>` (Next.js) used in `CourseCard`. Upload previews use `<img src={URL.createObjectURL(file)}>`.
+
+## CourseSearch Component
+`components/CourseSearch.tsx` — unified search + name input used in `CourseModal`.
+- Queries `GET /api/courses/search?q=` after 350ms debounce
+- `skipNextSearchRef` (useRef) prevents the dropdown from re-opening after user selects a result
+- If no API key configured or no results found, falls back to plain text entry
+- `onSelect({ name, city })` — fills both name and city fields from a Places result
+
+## Validation
+All numeric fields (par, slope, rating) use `type="number"` with `min`/`max` and block `e`, `E`, `+`, `-` via `onKeyDown`. All text fields are `required`.
 
 ## CourseCard Component
-Image card with gradient overlay, 220px height, hover scale + gold shimmer. Shows rating/slope + par pills at bottom.
+`<Image fill>` card, 220px height, gradient overlay, hover scale + gold border shimmer. Shows rating/slope + par pills at bottom.

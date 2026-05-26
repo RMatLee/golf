@@ -2,15 +2,20 @@
 
 Displays the 3 most recent rounds as cards and all rounds in a sortable/filterable table.
 
-## Data Shape
+## Data Source
+Fetches from `GET /api/rounds` on mount. API route reads from Redis cache (`rounds:all`) or Supabase `rounds` table joined with `courses(name)`. Response shape validated by `roundItemSchema` (Zod).
+
 ```ts
-interface Round { id: string; date: string; course: string; score: number; par: number; }
+// RoundItem — matches z.infer<typeof roundItemSchema>
+interface RoundItem { id: string; date: string; course: string; score: number; par: number; }
 ```
-`SEED_ROUNDS` — 21 hardcoded rounds, dates 2024-03 through 2026-05.
 
 ## State
 | State | Type | Purpose |
 |-------|------|---------|
+| `rounds` | `RoundItem[]` | All rounds from API |
+| `loading` | `boolean` | Shows skeleton while fetching |
+| `error` | `boolean` | Shows error message in table area |
 | `search` | `string` | Filters table rows by course name (case-insensitive) |
 | `course` | `string` | Dropdown filter; `"All"` or a course name |
 | `sort` | `SortKey` | Controls table sort order |
@@ -23,7 +28,7 @@ interface Round { id: string; date: string; course: string; score: number; par: 
 - `tableRounds` — filtered by `search` + `course`, then sorted by `sort`
 
 ## Components
-- `RecentCard` — animated card (Framer Motion `initial/animate`), shows date, course, score, vs-par badge
+- `RecentCard` — animated card (Framer Motion), shows date, course, score, vs-par badge
 - Table rows — `AnimatePresence mode="popLayout"`, each row uses `motion.div layout`
 
 ## Helpers
