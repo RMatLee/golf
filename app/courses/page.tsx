@@ -214,7 +214,7 @@ function CourseModal({
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }} transition={{ duration: 0.22, ease: "easeOut" }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md px-4 max-h-[90vh] overflow-y-auto"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md px-4 max-h-[90svh] overflow-y-auto overscroll-contain"
           >
             <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] shadow-2xl p-7">
               <p className="text-[11px] uppercase tracking-[0.22em] text-[#c9a84c] font-semibold mb-1">
@@ -500,7 +500,7 @@ export default function CoursesPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-3xl mx-auto px-5 pt-28 pb-24">
+      <div className="max-w-3xl mx-auto px-5 pt-20 sm:pt-28 pb-24">
 
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
@@ -539,7 +539,7 @@ export default function CoursesPage() {
 
         {/* All courses table */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.25 }}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <p className="text-[10px] uppercase tracking-[0.2em] text-white/30 font-semibold">All Courses</p>
             <div className="relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" width="12" height="12" viewBox="0 0 13 13" fill="none">
@@ -548,12 +548,14 @@ export default function CoursesPage() {
               </svg>
               <input type="text" placeholder="Search courses..." value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="rounded-xl border border-white/10 bg-white/4 pl-8 pr-4 py-2 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors w-52" />
+                className="rounded-xl border border-white/10 bg-white/4 pl-8 pr-4 py-2 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors w-full sm:w-52" />
             </div>
           </div>
 
           <div className="rounded-2xl border border-white/8 overflow-hidden">
-            <div className="grid grid-cols-[2fr_1.5fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b border-white/6 bg-white/2">
+
+            {/* Desktop header */}
+            <div className="hidden sm:grid grid-cols-[2fr_1.5fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b border-white/6 bg-white/2">
               {["Course", "Location", "Par", "Best", "Played", "Rating / Slope"].map((h) => (
                 <span key={h} className="text-[10px] uppercase tracking-widest text-white/25 last:text-right">{h}</span>
               ))}
@@ -576,28 +578,58 @@ export default function CoursesPage() {
                   return (
                     <motion.div key={course.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                       transition={{ duration: 0.15, delay: i * 0.02 }}
-                      className="grid grid-cols-[2fr_1.5fr_auto_auto_auto_auto] gap-4 px-5 py-4 border-b border-white/4 last:border-0 hover:bg-white/3 transition-colors group items-center"
-                    >
-                      <p className="text-sm font-semibold text-white truncate">{course.name}</p>
-                      <p className="text-xs text-white/40 truncate">{course.city}</p>
-                      <p className="text-sm text-white/70 tabular-nums">{course.par}</p>
-                      <p className="text-sm font-bold text-[#c9a84c] tabular-nums">{bestScore ?? "--"}</p>
-                      <p className="text-sm text-white/50 tabular-nums">{timesPlayed}x</p>
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-white/35 tabular-nums">{course.rating} / {course.slope}</span>
+                      className="border-b border-white/4 last:border-0 hover:bg-white/3 transition-colors group">
+
+                      {/* Mobile row */}
+                      <div className="sm:hidden flex items-center gap-3 px-4 py-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{course.name}</p>
+                          <p className="text-xs text-white/40 truncate mt-0.5">{course.city}</p>
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <span className="text-[11px] text-white/30">Par {course.par}</span>
+                            <span className="text-[11px] text-white/30">{course.rating}/{course.slope}</span>
+                            {bestScore && <span className="text-[11px] text-[#c9a84c] font-bold">Best {bestScore}</span>}
+                            <span className="text-[11px] text-white/30">{timesPlayed}x</span>
+                          </div>
+                        </div>
                         {isAdmin && (
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                          <div className="flex gap-1 shrink-0">
                             <button onClick={() => { setEditTarget(course); setModalOpen(true); }}
-                              className="px-2 py-1 rounded-lg text-xs text-white/40 hover:text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors">
+                              className="px-3 py-1.5 rounded-lg text-xs text-white/50 bg-white/5 hover:text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors">
                               Edit
                             </button>
                             <button onClick={() => setDeleteTarget(course)}
-                              className="px-2 py-1 rounded-lg text-xs text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+                              className="px-3 py-1.5 rounded-lg text-xs text-white/40 bg-white/5 hover:text-red-400 hover:bg-red-400/10 transition-colors">
                               ✕
                             </button>
                           </div>
                         )}
                       </div>
+
+                      {/* Desktop row */}
+                      <div className="hidden sm:grid grid-cols-[2fr_1.5fr_auto_auto_auto_auto] gap-4 px-5 py-4 items-center">
+                        <p className="text-sm font-semibold text-white truncate">{course.name}</p>
+                        <p className="text-xs text-white/40 truncate">{course.city}</p>
+                        <p className="text-sm text-white/70 tabular-nums">{course.par}</p>
+                        <p className="text-sm font-bold text-[#c9a84c] tabular-nums">{bestScore ?? "--"}</p>
+                        <p className="text-sm text-white/50 tabular-nums">{timesPlayed}x</p>
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="text-xs text-white/35 tabular-nums">{course.rating} / {course.slope}</span>
+                          {isAdmin && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                              <button onClick={() => { setEditTarget(course); setModalOpen(true); }}
+                                className="px-2 py-1 rounded-lg text-xs text-white/40 hover:text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors">
+                                Edit
+                              </button>
+                              <button onClick={() => setDeleteTarget(course)}
+                                className="px-2 py-1 rounded-lg text-xs text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                     </motion.div>
                   );
                 })

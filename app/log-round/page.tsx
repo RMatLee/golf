@@ -487,7 +487,7 @@ export default function LogRoundPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-lg mx-auto px-5 pt-28 pb-24">
+      <div className="max-w-lg mx-auto px-5 pt-20 sm:pt-28 pb-24">
 
         <AnimatePresence mode="wait">
           {step < 2 && (

@@ -166,7 +166,7 @@ export default function StatsPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-3xl mx-auto px-5 pt-28 pb-24">
+      <div className="max-w-3xl mx-auto px-5 pt-20 sm:pt-28 pb-24">
 
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="mb-8">
