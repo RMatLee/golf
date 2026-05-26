@@ -2,21 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { redis, CACHE_KEYS, CACHE_TTL } from "@/lib/redis";
 import { supabase } from "@/lib/supabase";
 import { readLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
+import { homeStatsSchema, recentRoundSchema } from "@/lib/schemas";
+import { z } from "zod";
 
-export interface HomeStats {
-  lastScore:    string;
-  lastCourse:   string;
-  handicap:     string;
-  roundsPlayed: string;
-}
-
-export interface RecentRound {
-  id:     string;
-  date:   string;
-  course: string;
-  score:  number;
-  par:    number;
-}
+export type HomeStats   = z.infer<typeof homeStatsSchema>;
+export type RecentRound = z.infer<typeof recentRoundSchema>;
 
 export async function GET(req: NextRequest) {
   try {
@@ -54,14 +44,14 @@ export async function GET(req: NextRequest) {
 
     const latest = latestRound?.[0] as any;
 
-    const stats: HomeStats = {
+    const rawStats = {
       lastScore:    latest ? String(latest.score) : "—",
       lastCourse:   latest?.courses?.name ?? "—",
       handicap:     latest?.handicap != null ? String(latest.handicap) : "—",
       roundsPlayed: count != null ? String(count) : "—",
     };
 
-    const recentRounds: RecentRound[] = (recentData ?? []).map((r: any) => ({
+    const rawRecent = (recentData ?? []).map((r: any) => ({
       id:     r.id,
       date:   r.date,
       score:  r.score,
@@ -69,13 +59,21 @@ export async function GET(req: NextRequest) {
       course: r.courses?.name ?? "Unknown",
     }));
 
+    const parsedStats  = homeStatsSchema.safeParse(rawStats);
+    const parsedRecent = recentRoundSchema.array().safeParse(rawRecent);
+
+    if (!parsedStats.success || !parsedRecent.success) {
+      console.error("[/api/home] Data shape error:", parsedStats.error?.flatten(), parsedRecent.error?.flatten());
+      return NextResponse.json({ error: "Data integrity error" }, { status: 502 });
+    }
+
     // ── Populate cache ─────────────────────────────────────────────────────
     await Promise.all([
-      redis.set(CACHE_KEYS.homeStats,  stats,        { ex: CACHE_TTL }),
-      redis.set(CACHE_KEYS.homeRecent, recentRounds, { ex: CACHE_TTL }),
+      redis.set(CACHE_KEYS.homeStats,  parsedStats.data,   { ex: CACHE_TTL }),
+      redis.set(CACHE_KEYS.homeRecent, parsedRecent.data,  { ex: CACHE_TTL }),
     ]);
 
-    return NextResponse.json({ stats, recentRounds, source: "supabase" });
+    return NextResponse.json({ stats: parsedStats.data, recentRounds: parsedRecent.data, source: "supabase" });
   } catch (err) {
     console.error("[/api/home] Unexpected error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

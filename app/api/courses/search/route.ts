@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
+import { courseSearchQuerySchema } from "@/lib/schemas";
 
 export interface CourseSearchResult {
   name:    string;
@@ -19,15 +20,18 @@ export async function GET(req: NextRequest) {
     }
 
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-    const q      = req.nextUrl.searchParams.get("q")?.trim();
 
     if (!apiKey) {
       return NextResponse.json({ results: [], configured: false });
     }
 
-    if (!q || q.length < 2) {
+    const queryResult = courseSearchQuerySchema.safeParse({
+      q: req.nextUrl.searchParams.get("q") ?? "",
+    });
+    if (!queryResult.success) {
       return NextResponse.json({ results: [], configured: true });
     }
+    const { q } = queryResult.data;
 
     const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
     url.searchParams.set("query", `${q} golf course`);

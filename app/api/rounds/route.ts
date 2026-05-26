@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { redis, CACHE_KEYS, CACHE_TTL } from "@/lib/redis";
 import { supabase } from "@/lib/supabase";
 import { readLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
+import { roundItemSchema } from "@/lib/schemas";
+import { z } from "zod";
 
-export interface RoundItem {
-  id:     string;
-  date:   string;
-  course: string;
-  score:  number;
-  par:    number;
-}
+export type RoundItem = z.infer<typeof roundItemSchema>;
 
 export async function GET(req: NextRequest) {
   try {
@@ -39,7 +35,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch rounds" }, { status: 502 });
     }
 
-    const rounds: RoundItem[] = (data ?? []).map((r: any) => ({
+    const mapped = (data ?? []).map((r: any) => ({
       id:     r.id,
       date:   r.date,
       score:  r.score,
@@ -47,10 +43,16 @@ export async function GET(req: NextRequest) {
       course: r.courses?.name ?? "Unknown",
     }));
 
-    // ── Populate cache ─────────────────────────────────────────────────────
-    await redis.set(CACHE_KEYS.roundsAll, rounds, { ex: CACHE_TTL });
+    const parsed = roundItemSchema.array().safeParse(mapped);
+    if (!parsed.success) {
+      console.error("[/api/rounds] Data shape error:", parsed.error.flatten());
+      return NextResponse.json({ error: "Data integrity error" }, { status: 502 });
+    }
 
-    return NextResponse.json({ rounds, source: "supabase" });
+    // ── Populate cache ─────────────────────────────────────────────────────
+    await redis.set(CACHE_KEYS.roundsAll, parsed.data, { ex: CACHE_TTL });
+
+    return NextResponse.json({ rounds: parsed.data, source: "supabase" });
   } catch (err) {
     console.error("[/api/rounds] Unexpected error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

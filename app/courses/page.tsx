@@ -6,6 +6,7 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { CourseSearch } from "@/components/CourseSearch";
+import { toast } from "sonner";
 import type { CourseRow } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -393,19 +394,35 @@ export default function CoursesPage() {
   }, [stats, search]);
 
   async function handleSave(data: Omit<Course, "id" | "created_at">, id?: string) {
-    if (id) {
-      const { data: updated } = await supabase.from("courses").update(data).eq("id", id).select().single();
-      if (updated) setCourses((prev) => prev.map((c) => (c.id === id ? updated : c)));
-    } else {
-      const { data: created } = await supabase.from("courses").insert(data).select().single();
-      if (created) setCourses((prev) => [...prev, created]);
+    try {
+      if (id) {
+        const { data: updated, error } = await supabase.from("courses").update(data).eq("id", id).select().single();
+        if (error) throw error;
+        if (updated) setCourses((prev) => prev.map((c) => (c.id === id ? updated : c)));
+        toast.success("Course updated");
+      } else {
+        const { data: created, error } = await supabase.from("courses").insert(data).select().single();
+        if (error) throw error;
+        if (created) setCourses((prev) => [...prev, created]);
+        toast.success("Course added");
+      }
+    } catch (err) {
+      console.error("Course save failed:", err);
+      toast.error("Failed to save course. Please try again.");
     }
   }
 
   async function handleDelete(id: string) {
-    await supabase.from("courses").delete().eq("id", id);
-    setCourses((prev) => prev.filter((c) => c.id !== id));
-    setDeleteTarget(null);
+    try {
+      const { error } = await supabase.from("courses").delete().eq("id", id);
+      if (error) throw error;
+      setCourses((prev) => prev.filter((c) => c.id !== id));
+      setDeleteTarget(null);
+      toast.success("Course removed");
+    } catch (err) {
+      console.error("Course delete failed:", err);
+      toast.error("Failed to remove course. Please try again.");
+    }
   }
 
   return (

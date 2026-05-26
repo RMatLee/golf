@@ -5,6 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
 import type { ClubType } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -392,18 +393,34 @@ export default function ClubsPage() {
 
   async function handleSave(data: Omit<Club, "id">, id?: string) {
     const payload = { ...data, type: data.type as string };
-    if (id) {
-      const { data: updated } = await supabase.from("clubs").update(payload).eq("id", id).select().single();
-      if (updated) setClubs((prev) => prev.map((c) => (c.id === id ? (updated as Club) : c)));
-    } else {
-      const { data: created } = await supabase.from("clubs").insert(payload).select().single();
-      if (created) setClubs((prev) => [...prev, created as Club]);
+    try {
+      if (id) {
+        const { data: updated, error } = await supabase.from("clubs").update(payload).eq("id", id).select().single();
+        if (error) throw error;
+        if (updated) setClubs((prev) => prev.map((c) => (c.id === id ? (updated as Club) : c)));
+        toast.success("Club updated");
+      } else {
+        const { data: created, error } = await supabase.from("clubs").insert(payload).select().single();
+        if (error) throw error;
+        if (created) setClubs((prev) => [...prev, created as Club]);
+        toast.success("Club added");
+      }
+    } catch (err) {
+      console.error("Club save failed:", err);
+      toast.error("Failed to save club. Please try again.");
     }
   }
 
   async function handleDelete(id: string) {
-    await supabase.from("clubs").delete().eq("id", id);
-    setClubs((prev) => prev.filter((c) => c.id !== id));
+    try {
+      const { error } = await supabase.from("clubs").delete().eq("id", id);
+      if (error) throw error;
+      setClubs((prev) => prev.filter((c) => c.id !== id));
+      toast.success("Club removed");
+    } catch (err) {
+      console.error("Club delete failed:", err);
+      toast.error("Failed to remove club. Please try again.");
+    }
   }
 
   return (

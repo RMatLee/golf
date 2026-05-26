@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { ErrorBoundary } from "@/components/error-boundary";
 import type { HomeStats, RecentRound } from "@/app/api/home/route";
 
 export default function Home() {
@@ -66,6 +67,7 @@ export default function Home() {
       </section>
 
       {/* Stat Strip */}
+      <ErrorBoundary section="Stats">
       <section className="grid grid-cols-2 md:grid-cols-4 border-t border-white/10">
         {statStrip.map((stat, i) => (
           <div key={i} className="flex flex-col items-center justify-center py-10 border-r border-white/10 last:border-r-0">
@@ -74,8 +76,10 @@ export default function Home() {
           </div>
         ))}
       </section>
+      </ErrorBoundary>
 
       {/* Recent Rounds */}
+      <ErrorBoundary section="Recent Rounds">
       <section className="max-w-5xl mx-auto px-6 py-24">
         <motion.h2 initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
           transition={{ duration: 0.6 }} className="text-3xl font-light mb-12 border-l-2 border-[#c9a84c] pl-4">
@@ -123,6 +127,7 @@ export default function Home() {
           }
         </div>
       </section>
+      </ErrorBoundary>
     </main>
   );
 }

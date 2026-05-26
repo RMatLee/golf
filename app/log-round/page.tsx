@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { CourseSearch } from "@/components/CourseSearch";
+import { toast } from "sonner";
 import type { CourseRow } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -347,55 +348,61 @@ export default function LogRoundPage() {
     let courseId = selectedId;
     let resolved: Course | undefined = courses.find((c) => c.id === selectedId);
 
-    // If adding a new course, insert it first
-    if (selectedId === "new") {
-      // Upload image if one was selected
-      let image = toImageSlug(newCourse.name.trim());
-      if (imageFile) {
-        const ext      = imageFile.name.split(".").pop()?.toLowerCase() ?? "jpg";
-        const filePath = `${toImageSlug(newCourse.name.trim())}-${Date.now()}.${ext}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("course-images")
-          .upload(filePath, imageFile, { upsert: true });
-        if (!uploadError && uploadData) {
-          const { data: { publicUrl } } = supabase.storage
+    try {
+      // If adding a new course, insert it first
+      if (selectedId === "new") {
+        let image = toImageSlug(newCourse.name.trim());
+        if (imageFile) {
+          const ext      = imageFile.name.split(".").pop()?.toLowerCase() ?? "jpg";
+          const filePath = `${toImageSlug(newCourse.name.trim())}-${Date.now()}.${ext}`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
             .from("course-images")
-            .getPublicUrl(uploadData.path);
-          image = publicUrl;
+            .upload(filePath, imageFile, { upsert: true });
+          if (!uploadError && uploadData) {
+            const { data: { publicUrl } } = supabase.storage
+              .from("course-images")
+              .getPublicUrl(uploadData.path);
+            image = publicUrl;
+          }
+        }
+
+        const { data: created, error: courseError } = await supabase.from("courses").insert({
+          name:   newCourse.name.trim(),
+          city:   newCourse.city.trim(),
+          par:    Number(newCourse.par)    || 72,
+          rating: Number(newCourse.rating) || 0,
+          slope:  Number(newCourse.slope)  || 113,
+          image,
+        }).select().single();
+
+        if (courseError) throw new Error("Failed to save course");
+        if (created) {
+          setCourses((prev) => [...prev, created]);
+          courseId = created.id;
+          resolved = created;
         }
       }
 
-      const { data: created } = await supabase.from("courses").insert({
-        name:   newCourse.name.trim(),
-        city:   newCourse.city.trim(),
-        par:    Number(newCourse.par)    || 72,
-        rating: Number(newCourse.rating) || 0,
-        slope:  Number(newCourse.slope)  || 113,
-        image,
-      }).select().single();
+      const { error: roundError } = await supabase.from("rounds").insert({
+        date:      roundForm.date,
+        course_id: courseId,
+        score:     Number(roundForm.score),
+        par:       resolved?.par ?? 72,
+        putts:     Number(roundForm.putts),
+      });
 
-      if (created) {
-        setCourses((prev) => [...prev, created]);
-        courseId = created.id;
-        resolved = created;
-      }
+      if (roundError) throw new Error("Failed to save round");
+
+      await fetch("/api/cache/invalidate", { method: "POST" });
+
+      setSavedCourse(resolved ?? null);
+      setSubmitting(false);
+      setStep(2);
+    } catch (err) {
+      console.error("Log round failed:", err);
+      toast.error(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setSubmitting(false);
     }
-
-    // Insert the round
-    await supabase.from("rounds").insert({
-      date:      roundForm.date,
-      course_id: courseId,
-      score:     Number(roundForm.score),
-      par:       resolved?.par ?? 72,
-      putts:     Number(roundForm.putts),
-    });
-
-    // Invalidate Redis cache so next page load fetches fresh data
-    await fetch("/api/cache/invalidate", { method: "POST" });
-
-    setSavedCourse(resolved ?? null);
-    setSubmitting(false);
-    setStep(2);
   }
 
   function handleLogAnother() {

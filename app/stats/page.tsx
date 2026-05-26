@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
+import { ErrorBoundary } from "@/components/error-boundary";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -186,6 +187,7 @@ export default function StatsPage() {
           </p>
         )}
         {!loading && !error && (
+          <ErrorBoundary section="Charts">
           <div className="flex flex-col gap-5">
             <ChartCard title="Score Trend" subtitle="Scoring" delay={0.2}>
               <ResponsiveContainer width="100%" height={220}>
@@ -254,6 +256,7 @@ export default function StatsPage() {
               )}
             </ChartCard>
           </div>
+          </ErrorBoundary>
         )}
       </div>
     </div>

@@ -4,6 +4,8 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 import { Providers } from "@/components/providers";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -33,7 +35,16 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <Navbar />
-          {children}
+          <ErrorBoundary section="Page">
+            {children}
+          </ErrorBoundary>
+          <Toaster
+            position="bottom-right"
+            theme="dark"
+            toastOptions={{
+              style: { background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" },
+            }}
+          />
         </Providers>
       </body>
     </html>
