@@ -11,8 +11,9 @@ const navLinks = [
   { label: "Rounds",    href: "/rounds"   },
   { label: "Stats",     href: "/stats"    },
   { label: "Courses",   href: "/courses"  },
-  { label: "Clubs",     href: "/clubs"    },
-  { label: "Log Round", href: "/log-round"},
+  { label: "Clubs",     href: "/clubs"     },
+  { label: "Scrambles", href: "/scrambles"},
+  { label: "Log Round", href: "/log-round" },
 ];
 
 const LockOpenIcon = () => (

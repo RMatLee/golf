@@ -66,3 +66,24 @@ export interface Database {
 // ─── App-level types (used across pages) ─────────────────────────────────────
 
 export type ClubType = "Driver" | "Fairway Woods" | "Hybrids" | "Irons" | "Wedges" | "Putter";
+
+// ─── Scramble types ───────────────────────────────────────────────────────────
+
+export interface ScramblePlayerRow {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface ScrambleRoundRow {
+  id: string;
+  date: string;
+  course: string;
+  p1_id: string;
+  p2_id: string | null;
+  p3_id: string | null;
+  p4_id: string | null;
+  team1_score: number;
+  team2_score: number;
+  created_at: string;
+}
