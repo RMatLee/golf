@@ -17,7 +17,7 @@ import type { ScramblePlayerRow, ScrambleRoundRow } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
   const { success, limit, reset, remaining } = await readLimiter.limit(getIP(req));
-  if (!success) return rateLimitResponse(reset, limit, remaining);
+  if (!success) return NextResponse.json({ error: "Too many requests" }, rateLimitResponse(reset, limit, remaining));
 
   try {
     const [{ data: rounds, error: roundsError }, { data: players, error: playersError }] =
