@@ -1,3 +1,16 @@
+/**
+ * GET /api/stats
+ *
+ * Returns all rounds with putts and a computed handicap differential, ordered
+ * oldest-first so Recharts can plot them chronologically left-to-right.
+ * Responses are cached in Redis for 24 hours and invalidated by POST /api/cache/invalidate.
+ *
+ * Response shape: { rounds: StatRound[], source: "cache" | "supabase" }
+ *
+ * Handicap differential formula per round:
+ *   (score − course_rating) × 113 / slope, rounded to one decimal.
+ *   9-hole rounds use half the course rating.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { redis, CACHE_KEYS, CACHE_TTL } from "@/lib/redis";
 import { supabase } from "@/lib/supabase";

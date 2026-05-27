@@ -1,3 +1,16 @@
+/**
+ * Application navigation bar.
+ *
+ * Renders two separate layouts that are toggled by screen width:
+ *  - Mobile (< sm): a fixed top bar with a hamburger menu that slides down a full-screen link list.
+ *  - Desktop (≥ sm): a floating pill centered at the top of the viewport with Framer Motion
+ *    layout animation (`layoutId="pill-indicator"`) that slides the active indicator between links.
+ *
+ * Auth state determines visibility of the lock icon (sign-in) vs. lock-open icon (sign-out).
+ * The "Log Round" link is styled as a gold CTA pill rather than a plain nav item.
+ *
+ * The mobile overlay (`fixed inset-0 z-30`) closes the menu when the user taps outside it.
+ */
 "use client";
 
 import Link from "next/link";

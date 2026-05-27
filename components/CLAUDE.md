@@ -11,7 +11,7 @@ Styled as `bg-[#c9a84c] text-black` pill. Only visible when user is authenticate
 
 ### Nav links
 ```ts
-[Home /, Rounds /rounds, Stats /stats, Courses /courses, Clubs /clubs, Log Round /log-round]
+[Home /, Rounds /rounds, Stats /stats, Courses /courses, Clubs /clubs, Scrambles /scrambles, Log Round /log-round]
 ```
 
 ## ErrorBoundary (`error-boundary.tsx`)

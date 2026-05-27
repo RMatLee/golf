@@ -1,3 +1,14 @@
+/**
+ * Authentication context and provider.
+ *
+ * Wraps Supabase Auth to expose a React context with the current session.
+ * `AuthProvider` subscribes to `onAuthStateChange` so all consumers re-render
+ * automatically on sign-in, sign-out, or token refresh — no manual polling needed.
+ *
+ * Usage:
+ *   const { session, loading, signOut } = useAuth();
+ *   const isAdmin = session !== null;
+ */
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
@@ -16,6 +27,10 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
 });
 
+/**
+ * Provides auth state to the component tree.
+ * Mount once at the root (`components/providers.tsx`).
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading]  = useState(true);
@@ -40,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Hook to access the current auth session, loading state, and sign-out action. */
 export function useAuth() {
   return useContext(AuthContext);
 }

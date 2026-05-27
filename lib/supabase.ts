@@ -1,3 +1,12 @@
+/**
+ * Supabase client singleton.
+ *
+ * Uses the anon key — suitable for public reads and RLS-gated writes.
+ * The singleton is pinned to `globalThis` in development to survive Hot Module
+ * Replacement without spawning duplicate GoTrueClient instances (which cause
+ * "Multiple GoTrueClient instances" warnings and can corrupt auth state).
+ * In production, module-level caching is sufficient.
+ */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Singleton — prevents duplicate GoTrueClient instances during HMR in dev

@@ -1,3 +1,15 @@
+/**
+ * Upstash rate limiter instances and request-utility helpers.
+ *
+ * Three sliding-window limiters with different thresholds are exported so that
+ * each API route can import the limiter appropriate for its cost profile:
+ *  - `readLimiter`   — cached reads; generous limit, cheap to serve
+ *  - `searchLimiter` — Google Places proxy; tight limit, each miss costs an API call
+ *  - `mutateLimiter` — cache invalidation; tightest, only fires after a round insert
+ *
+ * All limiters use per-IP keying via `getIP()`. `rateLimitResponse()` builds the
+ * 429 response object with standard `Retry-After` and `X-RateLimit-*` headers.
+ */
 import { Ratelimit } from "@upstash/ratelimit";
 import { NextRequest } from "next/server";
 import { redis } from "./redis";
@@ -28,6 +40,10 @@ export const mutateLimiter = new Ratelimit({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Resolves the real client IP from `x-forwarded-for` (set by proxies/CDN) or
+ * `x-real-ip`, falling back to `"anonymous"` when neither header is present.
+ */
 export function getIP(req: NextRequest): string {
   return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -36,6 +52,10 @@ export function getIP(req: NextRequest): string {
   );
 }
 
+/**
+ * Builds a 429 response config with standard rate-limit headers.
+ * Pass directly to `NextResponse.json(body, rateLimitResponse(...))`.
+ */
 export function rateLimitResponse(reset: number, limit: number, remaining: number) {
   return {
     status: 429,

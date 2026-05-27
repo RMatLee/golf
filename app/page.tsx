@@ -1,3 +1,13 @@
+/**
+ * Home page — hero section, stat strip, and recent rounds preview.
+ *
+ * Fetches from `GET /api/home` on mount (Redis-cached, 24 h TTL).
+ * The stat strip and recent-rounds section are each wrapped in their own
+ * `<ErrorBoundary>` so a crash in one does not take down the other.
+ *
+ * Loading state: stat strip shows "—" placeholders; recent rounds show pulse skeletons.
+ * Empty state: three placeholder cards prompt the user to log their first round.
+ */
 "use client";
 
 import { useEffect, useState } from "react";

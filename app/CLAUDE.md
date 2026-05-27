@@ -12,6 +12,7 @@ Applies to all routes. Sets up fonts (Inter, Geist), imports `globals.css`, rend
 /stats       → app/stats/page.tsx      Performance charts (Recharts)
 /courses     → app/courses/page.tsx    Course library (CRUD + image upload)
 /clubs       → app/clubs/page.tsx      Equipment bag (accordion + media upload)
+/scrambles   → app/scrambles/page.tsx  Scramble leaderboard, match history, admin match logging
 /log-round   → app/log-round/page.tsx  Multi-step round logging (auth-guarded)
 /login       → app/login/page.tsx      Email/password sign-in
 ```
@@ -24,6 +25,7 @@ All API routes follow the same pattern: rate limit → cache check → Supabase 
 | `/api/home` | GET | `readLimiter` | Stats strip + 3 recent rounds |
 | `/api/rounds` | GET | `readLimiter` | All rounds for history page |
 | `/api/stats` | GET | `readLimiter` | All rounds with putts/handicap for charts |
+| `/api/scrambles` | GET | `readLimiter` | Scramble players (with points) + match history |
 | `/api/courses/search` | GET | `searchLimiter` | Google Places course autocomplete |
 | `/api/cache/invalidate` | POST | `mutateLimiter` | Deletes all 4 Redis cache keys |
 
@@ -34,6 +36,7 @@ All content pages use `max-w-[2xl|3xl|5xl] mx-auto px-5 pt-28 pb-24`. The `pt-28
 Pages fetch from API routes via `useEffect` on mount. Loading states show skeleton/pulse placeholders. Error states show inline red messages. No direct Supabase reads from page components except:
 - `courses/page.tsx` and `clubs/page.tsx` — fetch their lists directly from Supabase on mount
 - `log-round/page.tsx` — fetches course list from Supabase; inserts rounds and courses directly to Supabase (auth-gated by RLS)
+- `scrambles/page.tsx` — reads via `/api/scrambles`; writes players/rounds directly to Supabase when admin logs a match (auth-gated by RLS)
 
 ## Auth Pattern
 ```ts

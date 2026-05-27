@@ -1,3 +1,24 @@
+/**
+ * Scrambles page — team scramble leaderboard, match history, and admin match logging.
+ *
+ * Data is loaded from `GET /api/scrambles` (not cached). Player points are computed
+ * server-side at read time by scanning all rounds; this page receives the final sorted list.
+ *
+ * Admin match-logging form (visible only when `isAdmin`):
+ *   Step 0 — Teams: date, course selection (existing or new), 4 player name inputs
+ *             (Player 1 + Player 3 required; Player 2 + Player 4 optional)
+ *   Step 1 — Scores: team scores with a "Log Match" submit button
+ *   Step 2 — Success: winner announcement with a "Log Another" shortcut
+ *
+ * Course selection mirrors `log-round/page.tsx`: choosing "+ Add a new course" reveals
+ * the full new-course form (CourseSearch + city + par/rating/slope + optional image upload).
+ * The new course is inserted into the `courses` table and appended to local state so it
+ * appears immediately in the dropdown without a re-fetch.
+ *
+ * Player upsert strategy (`getOrCreatePlayer`): looks up the player by name with
+ * `.maybeSingle()` (returns null instead of throwing on zero rows), then inserts only
+ * if no match is found. This means players are identified by name across sessions.
+ */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -53,6 +74,11 @@ function toImageSlug(name: string) {
   return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
+/**
+ * Looks up a scramble player by name; inserts a new record if none exists.
+ * Returns the player's UUID. Uses `maybeSingle()` to avoid a thrown error on
+ * zero rows (unlike `.single()`, which throws when no row is found).
+ */
 async function getOrCreatePlayer(name: string): Promise<string> {
   const trimmed = name.trim();
   const { data: existing } = await (supabase as any)
@@ -414,6 +440,12 @@ const PODIUM_SLOTS = [
   { rank: 3, label: "3rd", color: "#cd7f32", platformH: "h-14", delay: 0.25 },
 ] as const;
 
+/**
+ * Renders a 3-slot podium (2nd left, 1st center, 3rd right) with staggered spring
+ * animations. Slots without a corresponding player show an empty placeholder so the
+ * layout is stable even when fewer than 3 players have recorded wins.
+ * Platform heights visually distinguish 1st (tallest), 2nd, and 3rd (shortest).
+ */
 function Podium({ players }: { players: ScramblePlayer[] }) {
   if (players.length === 0) return null;
   return (

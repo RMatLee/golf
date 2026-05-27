@@ -1,5 +1,14 @@
+/**
+ * Shared TypeScript types for the Golf Tracker application.
+ *
+ * Database row interfaces mirror the Supabase table schemas exactly so that
+ * query results can be cast without runtime conversion. The `Database` interface
+ * types Insert/Update payloads, while app-level types cover UI and display logic.
+ */
+
 // ─── Database row types ───────────────────────────────────────────────────────
 
+/** Matches the `courses` table schema, including optional 9-hole split columns. */
 export interface CourseRow {
   id: string;
   name: string;
@@ -17,6 +26,7 @@ export interface CourseRow {
   created_at: string;
 }
 
+/** Matches the `rounds` table schema. `handicap` is computed at insert time from course rating/slope. */
 export interface RoundRow {
   id: string;
   date: string;
@@ -28,6 +38,7 @@ export interface RoundRow {
   created_at: string;
 }
 
+/** Matches the `clubs` table schema. `media_url` is a Supabase Storage public URL or null. */
 export interface ClubRow {
   id: string;
   name: string;
@@ -69,12 +80,18 @@ export type ClubType = "Driver" | "Fairway Woods" | "Hybrids" | "Irons" | "Wedge
 
 // ─── Scramble types ───────────────────────────────────────────────────────────
 
+/** Matches the `scramble_players` table. Players are created on first match appearance and reused by name. */
 export interface ScramblePlayerRow {
   id: string;
   name: string;
   created_at: string;
 }
 
+/**
+ * Matches the `scramble_rounds` table.
+ * p1+p2 form Team 1; p3+p4 form Team 2. p1 and p3 are required; p2 and p4 are optional.
+ * Points are NOT stored here — they are derived at read time by counting wins in the API route.
+ */
 export interface ScrambleRoundRow {
   id: string;
   date: string;

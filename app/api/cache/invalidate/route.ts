@@ -1,3 +1,13 @@
+/**
+ * POST /api/cache/invalidate
+ *
+ * Deletes all four Redis cache keys in a single call, forcing the next read to
+ * re-fetch from Supabase. Called by the client immediately after a round is
+ * inserted so the home page, rounds list, and stats charts reflect the new data
+ * without waiting for the 24-hour TTL to expire.
+ *
+ * Response shape: { invalidated: true }
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { redis, CACHE_KEYS } from "@/lib/redis";
 import { mutateLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";

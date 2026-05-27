@@ -1,3 +1,11 @@
+/**
+ * Zod schemas — single source of truth for all API data shapes.
+ *
+ * Request schemas validate incoming query parameters before any work is done.
+ * Response schemas validate data *after* it has been mapped from raw Supabase rows,
+ * immediately before caching or returning — a mismatch indicates a data-integrity
+ * problem and should be surfaced as a 502, not silently swallowed.
+ */
 import { z } from "zod";
 
 // ── Request schemas ────────────────────────────────────────────────────────────

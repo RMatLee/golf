@@ -1,3 +1,17 @@
+/**
+ * GET /api/courses/search?q=<query>
+ *
+ * Proxies a Google Places Text Search request for golf courses and returns up to
+ * 5 formatted results. The API key is kept server-side to avoid exposure in the browser.
+ *
+ * When `GOOGLE_PLACES_API_KEY` is not configured, returns `{ results: [], configured: false }`
+ * so the `CourseSearch` component can fall back to plain text entry without any UI error.
+ *
+ * Response shape: { results: CourseSearchResult[], configured: boolean }
+ *
+ * City parsing: extracts the city+state abbreviation from Google's `formatted_address`
+ * string (comma-delimited, e.g. "Pebble Beach, CA 93953, USA").
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { searchLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
 import { courseSearchQuerySchema } from "@/lib/schemas";

@@ -1,3 +1,10 @@
+/**
+ * Upstash Redis client and cache configuration.
+ *
+ * All API read routes (home, rounds, stats) cache their Supabase responses here
+ * for 24 hours. The cache is invalidated wholesale via `POST /api/cache/invalidate`
+ * whenever a new round is logged. Courses and clubs are not cached.
+ */
 import { Redis } from "@upstash/redis";
 
 export const redis = new Redis({

@@ -1,3 +1,23 @@
+/**
+ * CourseSearch — unified course name input with optional Places autocomplete.
+ *
+ * On mount, probes `/api/courses/search?q=_` to check whether `GOOGLE_PLACES_API_KEY`
+ * is configured. If so, input keystrokes are debounced (400 ms) and matched against
+ * the Places API; results appear in a dropdown. If not configured, it renders as a
+ * plain text input with no dropdown.
+ *
+ * Selection flow:
+ *   1. User mouses down on a suggestion → `skipNextSearchRef` is set to true.
+ *   2. The `onSelect` callback fires, updating the parent's name and city fields.
+ *   3. The value change triggers a debounced search effect, but `skipNextSearchRef`
+ *      is checked first and the search is skipped, preventing the dropdown from
+ *      immediately reopening after selection.
+ *
+ * Props:
+ *   - `value` / `onChange` — controlled input value
+ *   - `onSelect({ name, city })` — called when a Places result is chosen
+ *   - `required` — forwarded to the underlying `<input>`
+ */
 "use client";
 
 import { useState, useEffect, useRef } from "react";

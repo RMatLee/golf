@@ -1,3 +1,13 @@
+/**
+ * Root layout — applied to every route in the application.
+ *
+ * Sets up:
+ *  - Google Fonts (Inter, Geist Sans, Geist Mono) via CSS variables
+ *  - `<Providers>` — injects AuthContext at the tree root
+ *  - `<Navbar>` — fixed navigation rendered above all page content
+ *  - `<ErrorBoundary section="Page">` — catches page-level render crashes
+ *  - `<Toaster>` (Sonner) — global toast notifications, bottom-right, dark theme
+ */
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";

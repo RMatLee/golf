@@ -1,3 +1,19 @@
+/**
+ * Rounds history page.
+ *
+ * Shows the 3 most recent rounds as animated cards, followed by a sortable and
+ * filterable table of all rounds. Fetches from `GET /api/rounds` (Redis-cached).
+ *
+ * Admin controls (edit/delete) appear only when `isAdmin` is true (`session !== null`).
+ * Writes go directly to Supabase using the authenticated user's session token;
+ * RLS on the `rounds` table rejects unauthenticated mutations. The Redis cache is
+ * invalidated via `POST /api/cache/invalidate` after every successful write.
+ *
+ * Key derived state (all memoized):
+ *  - `recentThree`  — top 3 rounds sorted newest-first, shown as cards
+ *  - `courses`      — deduplicated sorted course name list for the dropdown filter
+ *  - `tableRounds`  — full list filtered by `search`, `course`, and sorted by `sort`
+ */
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -108,6 +124,7 @@ type Course9H = {
   back_slope: number | null;
 };
 
+/** Computes a USGA handicap differential: (score − rating) × 113 / slope, to one decimal. */
 function calcDifferential(score: number, rating: number, slope: number) {
   return Math.round((score - rating) * 113 / slope * 10) / 10;
 }

@@ -1,3 +1,19 @@
+/**
+ * Reusable React error boundary (class component — hooks cannot catch render errors).
+ *
+ * Wraps a subtree and catches any render-phase exceptions thrown by descendants.
+ * On error, renders a dark-themed fallback card with a "Try again" reset button
+ * instead of crashing the whole page. An optional `fallback` prop overrides the
+ * default card if custom recovery UI is needed.
+ *
+ * Usage:
+ *   <ErrorBoundary section="Charts">
+ *     <RechartsComponent />
+ *   </ErrorBoundary>
+ *
+ * The `section` prop is used both in the fallback heading and in the console error
+ * prefix so errors can be quickly identified in logs: "[ErrorBoundary – Charts]".
+ */
 "use client";
 
 import { Component, ReactNode } from "react";

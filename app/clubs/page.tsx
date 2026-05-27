@@ -1,3 +1,19 @@
+/**
+ * Equipment Bag page — accordion of club type sections with dynamic media backgrounds.
+ *
+ * Fetches all clubs directly from Supabase on mount (no API route intermediary).
+ * Sections (Driver, Fairway Woods, Hybrids, Irons, Wedges, Putter) are defined in the
+ * static `CLUB_SECTIONS` config. Only one section is open at a time (`openSection` state).
+ *
+ * Dynamic section backgrounds: `lastClubMedia` finds the most recently inserted club in
+ * each type that has a `media_url`. When found, it overrides the static section default
+ * with the club's own image or video. This ensures the section background reflects the
+ * user's actual equipment. Background brightness is reduced to 0.3 (closed) / 0.45 (open)
+ * so text remains legible.
+ *
+ * Admin controls (Add/Edit/Delete) are rendered only when `isAdmin` (`session !== null`).
+ * Media uploads (images up to 5 MB, videos up to 50 MB) go to the `club-media` bucket.
+ */
 "use client";
 
 import { useState, useEffect } from "react";

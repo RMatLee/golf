@@ -9,6 +9,7 @@ A personal golf round and stats tracker. Public-facing with admin-only data entr
 - **Performance Stats** — 4 Recharts line charts (score trend, score vs par, putts, handicap) with time-range filters
 - **Course Library** — CRUD table with image upload, Google Places autocomplete, and duplicate prevention
 - **Equipment Bag** — accordion by club type with image/video upload per club; dynamic section backgrounds
+- **Scrambles** — team scramble leaderboard with podium visual (1st/2nd/3rd by points), full player rankings, match history, and admin-only match logging with inline new course creation
 - **Log a Round** — multi-step form (auth-guarded) with optional new course creation inline
 - **Admin Auth** — Supabase email/password sign-in; public read, authenticated writes
 
@@ -51,10 +52,13 @@ golf/
 │   │   └── page.tsx            # Multi-step round logging (auth-guarded)
 │   ├── login/
 │   │   └── page.tsx            # Email/password sign-in
+│   ├── scrambles/
+│   │   └── page.tsx            # Scramble leaderboard, match history, admin match logging
 │   └── api/
 │       ├── home/route.ts       # GET — stats strip + recent rounds (cached)
 │       ├── rounds/route.ts     # GET — all rounds (cached)
 │       ├── stats/route.ts      # GET — rounds with putts/handicap (cached)
+│       ├── scrambles/route.ts  # GET — players (with points) + match history
 │       ├── courses/
 │       │   └── search/route.ts # GET — Google Places course autocomplete
 │       └── cache/
@@ -68,7 +72,7 @@ golf/
 │       └── button.tsx          # shadcn/ui Button primitive
 ├── lib/
 │   ├── supabase.ts             # Supabase client (untyped)
-│   ├── types.ts                # CourseRow, RoundRow, ClubRow, ClubType
+│   ├── types.ts                # CourseRow, RoundRow, ClubRow, ClubType, ScramblePlayerRow, ScrambleRoundRow
 │   ├── redis.ts                # Upstash Redis client, CACHE_KEYS, CACHE_TTL
 │   ├── ratelimit.ts            # readLimiter, searchLimiter, mutateLimiter
 │   ├── auth-context.tsx        # AuthProvider + useAuth() hook
@@ -140,8 +144,29 @@ putts      integer not null default 0
 handicap   numeric not null default 0
 ```
 
+**`scramble_players`**
+```sql
+id         uuid primary key default gen_random_uuid()
+name       text unique not null
+created_at timestamptz default now()
+```
+
+**`scramble_rounds`**
+```sql
+id           uuid primary key default gen_random_uuid()
+date         date not null
+course       text not null
+p1_id        uuid not null references scramble_players(id)
+p2_id        uuid references scramble_players(id)
+p3_id        uuid references scramble_players(id)
+p4_id        uuid references scramble_players(id)
+team1_score  integer not null
+team2_score  integer not null
+created_at   timestamptz default now()
+```
+
 ### RLS Policies
-Enable RLS on all three tables, then run:
+Enable RLS on all tables, then run:
 
 ```sql
 -- Public read
@@ -158,6 +183,21 @@ CREATE POLICY "auth write" ON rounds   FOR ALL USING (auth.role() = 'authenticat
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.courses TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.clubs   TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.rounds  TO anon, authenticated;
+
+-- Scramble tables
+ALTER TABLE scramble_players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scramble_rounds  ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "public read scramble_players" ON scramble_players FOR SELECT TO public USING (true);
+CREATE POLICY "authenticated write scramble_players" ON scramble_players FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "public read scramble_rounds"  ON scramble_rounds  FOR SELECT TO public USING (true);
+CREATE POLICY "authenticated write scramble_rounds"  ON scramble_rounds  FOR INSERT TO authenticated WITH CHECK (true);
+
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT          ON public.scramble_players TO anon, authenticated;
+GRANT INSERT          ON public.scramble_players TO authenticated;
+GRANT SELECT          ON public.scramble_rounds  TO anon, authenticated;
+GRANT INSERT          ON public.scramble_rounds  TO authenticated;
 ```
 
 ### Storage Buckets

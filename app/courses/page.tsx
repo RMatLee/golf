@@ -1,3 +1,21 @@
+/**
+ * Course Library page — displays recently-played course cards and a full CRUD table.
+ *
+ * Fetches courses and rounds directly from Supabase on mount (no API route intermediary).
+ * The `useCourseStats` hook joins the two datasets to produce per-course play statistics.
+ *
+ * Admin controls (Add/Edit/Delete) are rendered only when `isAdmin` (`session !== null`).
+ * All writes use the authenticated user's Supabase session; RLS on the `courses` table
+ * rejects unauthenticated mutations. Course images are uploaded to the `course-images`
+ * storage bucket and their public URL is stored in the `image` column.
+ *
+ * Duplicate prevention: `isDuplicate(name)` performs a case-insensitive check against
+ * existing course names before an insert, surfacing a toast error instead of allowing
+ * Supabase to return a constraint violation.
+ *
+ * Recently played: iterates rounds sorted newest-first, deduplicating by course ID,
+ * to find the 3 most recently played distinct courses.
+ */
 "use client";
 
 import { useState, useMemo, useEffect } from "react";

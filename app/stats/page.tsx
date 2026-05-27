@@ -1,3 +1,19 @@
+/**
+ * Stats page — performance summary cards and Recharts line charts.
+ *
+ * Fetches from `GET /api/stats` (Redis-cached, 24 h TTL). The user can filter
+ * the dataset by a time/count window (`RoundFilter`) and by hole count (`HolesFilter`).
+ * All derived values (averages, best scores, handicap change) are recomputed via
+ * `useMemo` whenever the active filter changes.
+ *
+ * 9-hole normalization: score and putts for 9-hole rounds are doubled in `chartData`
+ * so they appear at a comparable scale on 18-hole charts. A "(9H rounds ×2)" note
+ * is shown when the filtered set contains any 9-hole rounds.
+ *
+ * All four charts (`Score Trend`, `Score vs Par`, `Putts Per Round`, `Handicap Trend`)
+ * are wrapped in a single `<ErrorBoundary section="Charts">` so a Recharts render
+ * crash does not destroy the stat cards above.
+ */
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -33,6 +49,12 @@ const HOLES_FILTERS: { key: HolesFilter; label: string }[] = [
   { key: "9",   label: "9H"   },
 ];
 
+/**
+ * Returns a chronologically-sorted subset of rounds matching the given filter.
+ * Count-based filters (`last5`, `last10`, `last20`) slice from the end of the
+ * sorted array. Date-based filters (`30d`, `90d`, `thisYear`) compare against
+ * `Date.now()` at call time so the result is always relative to today.
+ */
 function applyFilter(rounds: Round[], filter: RoundFilter): Round[] {
   const sorted = [...rounds].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const now = new Date();

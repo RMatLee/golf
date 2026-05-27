@@ -47,9 +47,10 @@ All data is served through **Next.js API routes** (`app/api/`) — never fetched
 
 ```
 Client → /api/home | /api/rounds | /api/stats   (cached reads, rate-limited)
+Client → /api/scrambles                         (uncached read, rate-limited)
 Client → /api/courses/search                    (Google Places proxy, rate-limited)
 Client → /api/cache/invalidate                  (POST, rate-limited; called after round insert)
-Client → supabase (courses/clubs CRUD, round insert) — authenticated writes only, RLS enforced
+Client → supabase (courses/clubs CRUD, round insert, scramble writes) — authenticated writes only, RLS enforced
 ```
 
 ### Caching Strategy
@@ -60,7 +61,7 @@ Client → supabase (courses/clubs CRUD, round insert) — authenticated writes 
 | `rounds:all`    | `/api/rounds`  | `POST /api/cache/invalidate` |
 | `stats:all`     | `/api/stats`   | `POST /api/cache/invalidate` |
 
-Courses and clubs are **not cached** — their pages write directly to Supabase and re-fetch on mount.
+Courses, clubs, and scrambles are **not cached** — their pages write directly to Supabase and re-fetch on mount. The `/api/scrambles` route reads from Supabase on every request (no Redis layer) because points are calculated dynamically from round history.
 
 ### Authentication
 - Single admin user via Supabase Auth (email/password)
@@ -102,6 +103,7 @@ Both buckets are public. URLs are stored directly in the `image` column (courses
 | `/stats` | `app/stats/page.tsx` | Recharts performance charts |
 | `/courses` | `app/courses/page.tsx` | Course library with CRUD + image upload |
 | `/clubs` | `app/clubs/page.tsx` | Equipment bag with media upload |
+| `/scrambles` | `app/scrambles/page.tsx` | Scramble leaderboard, match history, admin match logging |
 | `/log-round` | `app/log-round/page.tsx` | Multi-step round logging (auth-guarded) |
 | `/login` | `app/login/page.tsx` | Email/password sign-in |
 
@@ -109,7 +111,7 @@ Both buckets are public. URLs are stored directly in the `image` column (courses
 | File | Purpose |
 |------|---------|
 | `supabase.ts` | Untyped Supabase client (no `<Database>` generic — avoids `never` type errors) |
-| `types.ts` | `CourseRow`, `RoundRow`, `ClubRow`, `Database`, `ClubType` |
+| `types.ts` | `CourseRow`, `RoundRow`, `ClubRow`, `Database`, `ClubType`, `ScramblePlayerRow`, `ScrambleRoundRow` |
 | `redis.ts` | Redis client, `CACHE_KEYS`, `CACHE_TTL` |
 | `ratelimit.ts` | `readLimiter`, `searchLimiter`, `mutateLimiter`; `getIP()`; `rateLimitResponse()` |
 | `auth-context.tsx` | `AuthProvider`, `useAuth()` hook |

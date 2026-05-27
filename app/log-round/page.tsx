@@ -1,3 +1,22 @@
+/**
+ * Log Round page — auth-guarded multi-step wizard for recording a new round.
+ *
+ * Redirects unauthenticated users to `/login` before rendering. Steps:
+ *   0 — Round Details: date, holes (9 or 18), score, putts, optional 9-hole side
+ *   1 — Course: pick an existing course from the dropdown, or choose "+ Add new"
+ *       to reveal the full new-course form (CourseSearch, city, par, rating, slope, image)
+ *   2 — Success: summary card with "Log Another" and "Back to Home" actions
+ *
+ * Submit flow:
+ *   1. If adding a new course, upload optional image to `course-images` bucket,
+ *      then insert into `courses` table. Append to local `courses` state.
+ *   2. Insert into `rounds` table with computed par and handicap differential.
+ *   3. Call `POST /api/cache/invalidate` so home/rounds/stats pages reflect the new data.
+ *
+ * Handicap differential: (score − course_rating) × 113 / slope, rounded to one decimal.
+ * For 9-hole rounds, course_rating and slope are taken from the course's front/back columns
+ * when available; otherwise the full-18 values are halved.
+ */
 "use client";
 
 import { useState, useEffect } from "react";

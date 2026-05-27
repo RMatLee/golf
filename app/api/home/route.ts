@@ -1,3 +1,15 @@
+/**
+ * GET /api/home
+ *
+ * Returns the stat strip values and the 3 most recent rounds for the home page.
+ * Responses are cached in Redis for 24 hours and invalidated by POST /api/cache/invalidate.
+ *
+ * Response shape: { stats: HomeStats, recentRounds: RecentRound[], source: "cache" | "supabase" }
+ *
+ * The handicap differential is computed here using the USGA formula:
+ *   (score − course_rating) × 113 / slope, rounded to one decimal.
+ *   For 9-hole rounds, course_rating is halved before the calculation.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { redis, CACHE_KEYS, CACHE_TTL } from "@/lib/redis";
 import { supabase } from "@/lib/supabase";

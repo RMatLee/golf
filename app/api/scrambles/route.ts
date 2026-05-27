@@ -1,3 +1,15 @@
+/**
+ * GET /api/scrambles
+ *
+ * Returns all scramble players with their total win points, and all processed
+ * match rounds. Points are computed dynamically at request time — not stored in
+ * the database — by scanning every round and crediting 1 point to the winning team.
+ * This keeps the schema simple at the cost of a full table scan per request.
+ * The route is intentionally not cached because matches are infrequent and the
+ * dataset is small.
+ *
+ * Response shape: { players: { id, name, points }[], rounds: ProcessedRound[] }
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { readLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
