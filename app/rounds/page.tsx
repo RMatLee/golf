@@ -132,7 +132,7 @@ function calcDifferential(score: number, rating: number, slope: number) {
 function EditModal({ round, onClose, onSaved }: {
   round: Round;
   onClose: () => void;
-  onSaved: (updated: { id: string; date: string; score: number; par: number; holes: number }) => void;
+  onSaved: (updated: { id: string; date: string; score: number; par: number; holes: 9 | 18 }) => void;
 }) {
   const [form, setForm]         = useState({
     date: round.date, score: String(round.score), putts: "",
@@ -202,7 +202,7 @@ function EditModal({ round, onClose, onSaved }: {
       if (error) throw error;
       await fetch("/api/cache/invalidate", { method: "POST" });
       toast.success("Round updated");
-      onSaved({ id: round.id, date: form.date, score: Number(form.score), par, holes: Number(form.holes) });
+      onSaved({ id: round.id, date: form.date, score: Number(form.score), par, holes: Number(form.holes) as 9 | 18 });
     } catch {
       toast.error("Failed to update round");
       setSaving(false);
@@ -406,7 +406,7 @@ export default function RoundsPage() {
     return result;
   }, [rounds, search, course, sort]);
 
-  function handleSaved(updated: { id: string; date: string; score: number; par: number; holes: number }) {
+  function handleSaved(updated: { id: string; date: string; score: number; par: number; holes: 9 | 18 }) {
     setRounds((prev) => prev.map((r) => r.id === updated.id ? { ...r, ...updated } : r));
     setEditTarget(null);
   }
