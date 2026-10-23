@@ -31,7 +31,7 @@ A personal golf round and stats tracker. Public-facing with admin-only data entr
 | Rate Limiting | Upstash Ratelimit | ^2 |
 | Validation | Zod | (peer dep) |
 | Toasts | Sonner | ^2 |
-| Course Search | Google Places Text Search API | — |
+| Course Search | Google Places API (New), Text Search | — |
 
 ## Project Structure
 
@@ -105,7 +105,31 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
 | `UPSTASH_REDIS_REST_URL` | Yes | Upstash Redis REST endpoint |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes | Upstash Redis auth token |
-| `GOOGLE_PLACES_API_KEY` | No | Enables course search autocomplete; app works without it |
+| `GOOGLE_PLACES_API_KEY` | No | Places API (New) server-side key; enables course search autocomplete |
+
+## Google Places Setup (Optional)
+
+1. In Google Cloud Console, select your project and link an active billing account.
+2. Under **APIs & Services > Library**, enable **Places API (New)**.
+3. Under **Credentials**, create or select an API key and restrict its API access to
+   **Places API (New)**. Requests originate from the Next.js server, so do not use
+   website/HTTP-referrer restrictions. IP restrictions require a stable server egress IP.
+4. Set `GOOGLE_PLACES_API_KEY` in `.env.local` and restart the development server.
+   For deployment, set the same variable in your hosting provider's environment
+   settings for each environment you use, then redeploy. Never expose it as a
+   `NEXT_PUBLIC_` variable.
+5. Test `/api/courses/search?q=Pebble`. A working configuration returns
+   `{ "results": [...], "configured": true }`. Course selection fills the name and city.
+
+The server uses `POST https://places.googleapis.com/v1/places:searchText` and requests
+only place IDs, display names, and formatted addresses, returning at most five suggestions.
+This replaces Text Search (Legacy); enabling only Maps JavaScript API is not sufficient.
+Display names require the Text Search Pro SKU; review Google Maps Platform pricing
+and set appropriate quotas and billing alerts.
+
+Without a key, course names can still be entered manually. Search also depends on
+Upstash Redis for rate limiting. If Google rejects a request, inspect hosting logs
+for `[/api/courses/search] Google Places error` and check billing and key restrictions.
 
 ## Supabase Setup
 

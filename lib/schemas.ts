@@ -18,6 +18,14 @@ export const courseSearchQuerySchema = z.object({
 // These validate the data shape after mapping from Supabase rows.
 // If a row doesn't match, it's a data-integrity problem — logged as 502.
 
+export const googlePlacesResponseSchema = z.object({
+  places: z.array(z.object({
+    id: z.string().min(1),
+    displayName: z.object({ text: z.string().min(1) }),
+    formattedAddress: z.string().optional(),
+  })).default([]),
+});
+
 export const roundItemSchema = z.object({
   id:     z.string(),
   date:   z.string(),

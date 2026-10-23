@@ -1,7 +1,7 @@
 /**
  * GET /api/courses/search?q=<query>
  *
- * Proxies a Google Places Text Search request for golf courses and returns up to
+ * Proxies a Google Places Text Search (New) request for golf courses and returns up to
  * 5 formatted results. The API key is kept server-side to avoid exposure in the browser.
  *
  * When `GOOGLE_PLACES_API_KEY` is not configured, returns `{ results: [], configured: false }`
@@ -9,12 +9,12 @@
  *
  * Response shape: { results: CourseSearchResult[], configured: boolean }
  *
- * City parsing: extracts the city+state abbreviation from Google's `formatted_address`
+ * City parsing: extracts the city+state abbreviation from Google's `formattedAddress`
  * string (comma-delimited, e.g. "Pebble Beach, CA 93953, USA").
  */
 import { NextRequest, NextResponse } from "next/server";
 import { searchLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
-import { courseSearchQuerySchema } from "@/lib/schemas";
+import { courseSearchQuerySchema, googlePlacesResponseSchema } from "@/lib/schemas";
 
 export interface CourseSearchResult {
   name:    string;
@@ -47,31 +47,37 @@ export async function GET(req: NextRequest) {
     }
     const { q } = queryResult.data;
 
-    const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-    url.searchParams.set("query", `${q} golf course`);
-    url.searchParams.set("type", "golf_course");
-    url.searchParams.set("key", apiKey);
-
-    const res = await fetch(url.toString());
+    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress",
+      },
+      body: JSON.stringify({
+        textQuery: `${q} golf course`,
+        includedType: "golf_course",
+        pageSize: 5,
+      }),
+    });
 
     if (!res.ok) {
       console.error("[/api/courses/search] Google Places error:", res.status, res.statusText);
       return NextResponse.json({ error: "Search service unavailable" }, { status: 502 });
     }
 
-    const data = await res.json();
-
-    if (data.status && data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-      console.error("[/api/courses/search] Google Places API status:", data.status);
+    const data = googlePlacesResponseSchema.safeParse(await res.json());
+    if (!data.success) {
+      console.error("[/api/courses/search] Invalid Google Places response:", data.error);
       return NextResponse.json({ error: "Search service error", results: [], configured: true }, { status: 502 });
     }
 
-    const results: CourseSearchResult[] = (data.results ?? []).slice(0, 5).map((place: any) => {
-      const parts     = (place.formatted_address ?? "").split(",");
+    const results: CourseSearchResult[] = data.data.places.slice(0, 5).map((place) => {
+      const parts     = (place.formattedAddress ?? "").split(",");
       const cityPart  = parts.length >= 3 ? parts[parts.length - 3]?.trim() : parts[0]?.trim();
       const statePart = parts.length >= 3 ? parts[parts.length - 2]?.trim().split(" ")[0] : "";
       const city      = statePart ? `${cityPart}, ${statePart}` : (cityPart ?? "");
-      return { name: place.name, city, placeId: place.place_id };
+      return { name: place.displayName.text, city, placeId: place.id };
     });
 
     return NextResponse.json({ results, configured: true });
