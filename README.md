@@ -13,6 +13,12 @@ A personal golf round and stats tracker. Public-facing with admin-only data entr
 - **Log a Round** — multi-step form (auth-guarded) with optional new course creation inline
 - **Admin Auth** — Supabase email/password sign-in; public read, authenticated writes
 
+## E2E Call Flow
+
+The [interactive E2E call diagram](./e2e-calls.html) traces public page reads through rate limiting, Redis, and Supabase, plus admin sign-in, data writes, course search, media uploads, round logging, and cache invalidation. Its editable [sequence specification](./e2e-calls.sequence.json) is also included.
+
+Playwright E2E tests cover public navigation, the unauthenticated round-log redirect, and admin round logging (including nine-hole rounds, failed inserts/retry, and cache invalidation). The test fixtures intercept API and Supabase requests rather than contacting live services.
+
 ## Tech Stack
 
 | Layer | Technology | Version |

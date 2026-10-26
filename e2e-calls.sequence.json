@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Golf Tracker E2E Calls",
+    "output": "e2e-calls.html",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [1600, 860]
+  },
+  "participants": [
+    { "id": "browser", "type": "frontend", "label": "Visitor / Admin" },
+    { "id": "ui", "type": "frontend", "label": "Golf Tracker UI" },
+    { "id": "api", "type": "backend", "label": "Next.js API" },
+    { "id": "auth", "type": "security", "label": "Supabase Auth" },
+    { "id": "redis", "type": "cloud", "label": "Upstash Redis" },
+    { "id": "database", "type": "database", "label": "Supabase Postgres" },
+    { "id": "storage", "type": "cloud", "label": "Supabase Storage" },
+    { "id": "places", "type": "external", "label": "Google Places" }
+  ],
+  "messages": [
+    {
+      "id": "open-pages",
+      "from": "browser",
+      "to": "ui",
+      "y": 160,
+      "label": "Browse home, rounds, stats, scrambles"
+    },
+    {
+      "id": "request-public-data",
+      "from": "ui",
+      "to": "api",
+      "y": 198,
+      "label": "GET /api/home, /rounds, /stats",
+      "note": "The scrambles page separately calls GET /api/scrambles."
+    },
+    {
+      "id": "read-limit-cache",
+      "from": "api",
+      "to": "redis",
+      "y": 236,
+      "label": "Rate limit + Redis cache lookup",
+      "note": "Cached read routes use Upstash; scrambles is rate-limited but uncached."
+    },
+    {
+      "id": "query-on-miss",
+      "from": "api",
+      "to": "database",
+      "y": 274,
+      "label": "Cache miss: query Supabase",
+      "note": "Map rows, compute stats, validate with Zod, then cache."
+    },
+    {
+      "id": "return-public-data",
+      "from": "api",
+      "to": "ui",
+      "y": 312,
+      "label": "Return JSON: cache hit or validated result",
+      "variant": "return"
+    },
+    {
+      "id": "render-public-data",
+      "from": "ui",
+      "to": "browser",
+      "y": 350,
+      "label": "Render page data",
+      "note": "Recent rounds, score stats, charts, and scramble leaderboard."
+    },
+    {
+      "id": "admin-signin",
+      "from": "browser",
+      "to": "ui",
+      "y": 404,
+      "label": "Admin opens sign-in or protected controls"
+    },
+    {
+      "id": "supabase-login",
+      "from": "ui",
+      "to": "auth",
+      "y": 442,
+      "label": "signInWithPassword(email, password)"
+    },
+    {
+      "id": "auth-session",
+      "from": "auth",
+      "to": "ui",
+      "y": 480,
+      "label": "Session updates AuthProvider",
+      "variant": "return",
+      "note": "A missing session redirects /log-round to /login and hides admin controls."
+    },
+    {
+      "id": "admin-data-writes",
+      "from": "ui",
+      "to": "database",
+      "y": 518,
+      "label": "Direct Supabase writes",
+      "note": "Course / club CRUD and scramble-player / match inserts."
+    },
+    {
+      "id": "course-search",
+      "from": "ui",
+      "to": "api",
+      "y": 556,
+      "label": "GET /api/courses/search?q=..."
+    },
+    {
+      "id": "places-search",
+      "from": "api",
+      "to": "places",
+      "y": 594,
+      "label": "places:searchText",
+      "note": "Optional server-side Google Places call; manual entry works without a key."
+    },
+    {
+      "id": "search-results",
+      "from": "api",
+      "to": "ui",
+      "y": 632,
+      "label": "Return course suggestions",
+      "variant": "return"
+    },
+    {
+      "id": "media-upload",
+      "from": "ui",
+      "to": "storage",
+      "y": 670,
+      "label": "Upload course / club media"
+    },
+    {
+      "id": "insert-round",
+      "from": "ui",
+      "to": "database",
+      "y": 708,
+      "label": "Insert rounds row",
+      "note": "On success, the form reports the saved round."
+    },
+    {
+      "id": "invalidate-request",
+      "from": "ui",
+      "to": "api",
+      "y": 746,
+      "label": "POST /api/cache/invalidate",
+      "note": "Called after a successful round insert."
+    },
+    {
+      "id": "delete-cache",
+      "from": "api",
+      "to": "redis",
+      "y": 777,
+      "label": "Delete home, rounds, stats keys"
+    }
+  ]
+}
