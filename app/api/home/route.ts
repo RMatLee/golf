@@ -16,9 +16,18 @@ import { supabase } from "@/lib/supabase";
 import { readLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
 import { homeStatsSchema, recentRoundSchema } from "@/lib/schemas";
 import { z } from "zod";
+import type { CourseRow, RoundRow } from "@/lib/types";
 
 export type HomeStats   = z.infer<typeof homeStatsSchema>;
 export type RecentRound = z.infer<typeof recentRoundSchema>;
+type LatestRound = Pick<RoundRow, "score"> & {
+  holes: number | null;
+  courses: Pick<CourseRow, "name" | "rating" | "slope"> | null;
+};
+type RecentRoundRow = Pick<RoundRow, "id" | "date" | "score" | "par"> & {
+  holes: number | null;
+  courses: Pick<CourseRow, "name"> | null;
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,9 +53,9 @@ export async function GET(req: NextRequest) {
     // ── Cache miss — fetch from Supabase ───────────────────────────────────
     const [{ data: latestRound, error: e1 }, { count, error: e2 }, { data: recentData, error: e3 }] =
       await Promise.all([
-        supabase.from("rounds").select("score, holes, courses(name, rating, slope)").order("date", { ascending: false }).limit(1),
+        supabase.from("rounds").select("score, holes, courses(name, rating, slope)").order("date", { ascending: false }).limit(1).returns<LatestRound[]>(),
         supabase.from("rounds").select("*", { count: "exact", head: true }),
-        supabase.from("rounds").select("id, date, score, par, holes, courses(name)").order("date", { ascending: false }).limit(3),
+        supabase.from("rounds").select("id, date, score, par, holes, courses(name)").order("date", { ascending: false }).limit(3).returns<RecentRoundRow[]>(),
       ]);
 
     if (e1 || e2 || e3) {
@@ -54,12 +63,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch data" }, { status: 502 });
     }
 
-    const latest = latestRound?.[0] as any;
+    const latest = latestRound?.[0];
 
     let handicapStr = "—";
     if (latest) {
-      const rating    = (latest.courses?.rating ?? null) as number | null;
-      const slope     = (latest.courses?.slope  ?? null) as number | null;
+      const rating    = latest.courses?.rating ?? null;
+      const slope     = latest.courses?.slope ?? null;
       if (rating && slope) {
         const adjRating = (latest.holes ?? 18) === 9 ? rating / 2 : rating;
         handicapStr = String(Math.round((latest.score - adjRating) * 113 / slope * 10) / 10);
@@ -68,12 +77,12 @@ export async function GET(req: NextRequest) {
 
     const rawStats = {
       lastScore:    latest ? String(latest.score) : "—",
-      lastCourse:   (latest as any)?.courses?.name ?? "—",
+      lastCourse:   latest?.courses?.name ?? "—",
       handicap:     handicapStr,
       roundsPlayed: count != null ? String(count) : "—",
     };
 
-    const rawRecent = (recentData ?? []).map((r: any) => ({
+    const rawRecent = (recentData ?? []).map((r) => ({
       id:     r.id,
       date:   r.date,
       score:  r.score,

@@ -7,9 +7,9 @@
  * plain text input with no dropdown.
  *
  * Selection flow:
- *   1. User mouses down on a suggestion → `skipNextSearchRef` is set to true.
+ *   1. User mouses down on a suggestion → the selected name is recorded.
  *   2. The `onSelect` callback fires, updating the parent's name and city fields.
- *   3. The value change triggers a debounced search effect, but `skipNextSearchRef`
+ *   3. The value change triggers a debounced search effect, but the selected name
  *      is checked first and the search is skipped, preventing the dropdown from
  *      immediately reopening after selection.
  *
@@ -20,7 +20,7 @@
  */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import type { CourseSearchResult } from "@/app/api/courses/search/route";
 
 interface Props {
@@ -31,12 +31,13 @@ interface Props {
 }
 
 export function CourseSearch({ value, onChange, onSelect, required }: Props) {
-  const [results,    setResults]    = useState<CourseSearchResult[]>([]);
+  const [search, setSearch] = useState<{ query: string; results: CourseSearchResult[]; error?: string } | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
   const [open,       setOpen]       = useState(false);
-  const [loading,    setLoading]    = useState(false);
   const [configured, setConfigured] = useState(false);
-  const debounceRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const skipNextSearchRef = useRef(false);
+  const canSearch = configured && value.trim().length >= 2 && value !== selectedName;
+  const results = canSearch && search?.query === value ? search.results : [];
+  const loading = canSearch && search?.query !== value;
 
   // Check once if the API key is present
   useEffect(() => {
@@ -47,38 +48,29 @@ export function CourseSearch({ value, onChange, onSelect, required }: Props) {
 
   // Debounced search — only runs when configured
   useEffect(() => {
-    if (!configured) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    // A result was just selected — skip this search cycle and reset the flag
-    if (skipNextSearchRef.current) {
-      skipNextSearchRef.current = false;
-      setResults([]);
-      setOpen(false);
-      setLoading(false);
-      return;
-    }
-
-    if (!value.trim() || value.length < 2) {
-      setResults([]);
-      setOpen(false);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    debounceRef.current = setTimeout(() => {
+    if (!canSearch) return;
+    let active = true;
+    const timeout = setTimeout(() => {
       fetch(`/api/courses/search?q=${encodeURIComponent(value)}`)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`Course search failed: ${r.status}`);
+          return r.json();
+        })
         .then(({ results }) => {
-          setResults(results ?? []);
+          if (!active) return;
+          setSearch({ query: value, results: results ?? [] });
           setOpen((results ?? []).length > 0);
-          setLoading(false);
+        })
+        .catch((error: unknown) => {
+          if (!active) return;
+          console.error("Course search failed:", error);
+          setSearch({ query: value, results: [], error: "Course search unavailable. Enter the course manually." });
+          setOpen(false);
         });
     }, 400);
 
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [value, configured]);
+    return () => { active = false; clearTimeout(timeout); };
+  }, [value, canSearch]);
 
   return (
     <div className="relative">
@@ -97,7 +89,11 @@ export function CourseSearch({ value, onChange, onSelect, required }: Props) {
           type="text"
           placeholder="e.g. Whistling Straits"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            setSelectedName(null);
+            setOpen(false);
+            onChange(e.target.value);
+          }}
           onFocus={() => results.length > 0 && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           className={`w-full rounded-xl border border-white/10 bg-white/5 ${configured ? "pl-9" : "px-4"} pr-4 py-3 text-sm text-white placeholder-white/20 focus:border-[#c9a84c]/50 focus:outline-none transition-colors`}
@@ -109,6 +105,9 @@ export function CourseSearch({ value, onChange, onSelect, required }: Props) {
           </span>
         )}
       </div>
+      {canSearch && search?.query === value && search.error && (
+        <p role="status" className="mt-1 text-xs text-red-400">{search.error}</p>
+      )}
 
       {/* Dropdown — only when configured and results exist */}
       {open && results.length > 0 && (
@@ -117,9 +116,8 @@ export function CourseSearch({ value, onChange, onSelect, required }: Props) {
             <li
               key={r.placeId}
               onMouseDown={() => {
-                skipNextSearchRef.current = true;
+                setSelectedName(r.name);
                 onSelect({ name: r.name, city: r.city });
-                setResults([]);
                 setOpen(false);
               }}
               className="px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"

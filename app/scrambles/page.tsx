@@ -81,13 +81,13 @@ function toImageSlug(name: string) {
  */
 async function getOrCreatePlayer(name: string): Promise<string> {
   const trimmed = name.trim();
-  const { data: existing } = await (supabase as any)
-    .from("scramble_players").select("id").eq("name", trimmed).maybeSingle();
-  if (existing?.id) return existing.id as string;
+  const { data: existing } = await supabase
+    .from("scramble_players").select("id").eq("name", trimmed).maybeSingle<{ id: string }>();
+  if (existing?.id) return existing.id;
   const { data: created, error } = await supabase
-    .from("scramble_players").insert({ name: trimmed }).select("id").single();
+    .from("scramble_players").insert({ name: trimmed }).select("id").single<{ id: string }>();
   if (error || !created) throw new Error(error?.message ?? `Failed to create player: ${trimmed}`);
-  return (created as any).id as string;
+  return created.id;
 }
 
 // ─── Field ────────────────────────────────────────────────────────────────────
@@ -506,21 +506,19 @@ export default function ScramblesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [lastWinner, setLastWinner] = useState<"team1" | "team2" | "tie">("tie");
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/scrambles");
-      if (!res.ok) throw new Error("Failed to load");
-      const json = await res.json();
-      setPlayers(json.players ?? []);
-      setRounds(json.rounds ?? []);
-    } catch {
-      setError("Failed to load scramble data.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadData = useCallback(() => (
+    fetch("/api/scrambles")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load");
+        return res.json();
+      })
+      .then((json) => {
+        setPlayers(json.players ?? []);
+        setRounds(json.rounds ?? []);
+      })
+      .catch(() => setError("Failed to load scramble data."))
+      .finally(() => setLoading(false))
+  ), []);
 
   useEffect(() => {
     loadData();
@@ -563,10 +561,10 @@ export default function ScramblesPage() {
           rating: Number(newCourse.rating) || 0,
           slope:  Number(newCourse.slope)  || 113,
           image,
-        }).select().single();
+        }).select().single<CourseRow>();
         if (courseError) throw new Error("Failed to save course");
-        courseName = (created as any).name;
-        setCourses((prev) => [...prev, created as CourseRow].sort((a, b) => a.name.localeCompare(b.name)));
+        courseName = created.name;
+        setCourses((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
       }
 
       const p1Id = await getOrCreatePlayer(form.player1);
@@ -592,6 +590,8 @@ export default function ScramblesPage() {
       const winner: "team1" | "team2" | "tie" = t1 < t2 ? "team1" : t2 < t1 ? "team2" : "tie";
       setLastWinner(winner);
       setStep(2);
+      setLoading(true);
+      setError("");
       loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong.");

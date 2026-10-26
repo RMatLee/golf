@@ -246,6 +246,105 @@ npm run build
 npm run start
 ```
 
+## Tests and CI
+
+Use Node.js 22 and run commands from the repository root (the directory containing
+`package.json`).
+
+```bash
+npm ci
+npm run lint
+npm run typecheck
+npm run test:unit       # Single Vitest run
+npm run test:coverage   # Coverage reports and enforced thresholds
+npm test               # Vitest watch mode
+```
+
+### Unit and component tests
+
+[Vitest configuration](./vitest.config.mts) uses React Testing Library and jsdom,
+with a Node environment for API/request tests. Tests live in
+[tests/unit](./tests/unit). Supabase and Redis operations are mocked; no real
+service credentials are required.
+
+The focused baseline covers schema validation, class merging, rate-limit helpers,
+auth initialization/events/sign-out/cleanup, and cache invalidation success,
+rate-limit, and error responses. Course autocomplete also has component regression
+tests for manual entry, debounce, selection, stale responses, and failures.
+
+**The 80% coverage gate applies per file, separately to lines, statements,
+functions, and branches, for these core modules only:**
+
+- [lib/schemas.ts](./lib/schemas.ts)
+- [lib/utils.ts](./lib/utils.ts)
+- [lib/ratelimit.ts](./lib/ratelimit.ts)
+- [lib/auth-context.tsx](./lib/auth-context.tsx)
+- [app/api/cache/invalidate/route.ts](./app/api/cache/invalidate/route.ts)
+
+This is not an 80% whole-app coverage claim. Expand `coverage.include` in the
+Vitest configuration as additional modules gain tests. Reports are written to
+`coverage/` (HTML, LCOV, and JSON summary).
+
+### End-to-end tests
+
+[Playwright configuration](./playwright.config.ts) runs Chromium against a
+**production build** on `http://127.0.0.1:3100`. It starts and stops its own server;
+keep that port free. Install Chromium once with `npx playwright install chromium`
+(on Linux CI, use `npx playwright install --with-deps chromium`).
+
+Build with placeholder public credentials, even when real values exist in
+`.env.local`: Next.js embeds `NEXT_PUBLIC_*` values at build time. Example for
+PowerShell:
+
+```powershell
+$env:NEXT_PUBLIC_SUPABASE_URL = "https://golf-test.supabase.co"
+$env:NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key"
+$env:UPSTASH_REDIS_REST_URL = "https://redis.invalid"
+$env:UPSTASH_REDIS_REST_TOKEN = "test-token"
+$env:GOOGLE_PLACES_API_KEY = ""
+npm run build
+if ($LASTEXITCODE -eq 0) { npm run test:e2e }
+```
+
+Use a dedicated terminal for these overrides, then close it before normal app
+development. Rebuild with your deployment environment before deploying; never
+deploy this placeholder-credential build.
+
+The tests exercise public navigation across all main pages, home data errors,
+the unauthenticated login guard, failed/successful login, required round fields,
+18-hole and front/back nine round payloads, cache invalidation, form reset, and
+failed-save retry.
+
+The automatic [backend fixture](./tests/e2e/fixtures.ts) intercepts app API,
+Supabase auth/REST, and optional Places-search requests in the browser. Unexpected
+API or external requests fail the test rather than reaching a real service.
+These tests validate app behavior, **not** real Supabase RLS, Redis connectivity,
+or Google Places integration.
+
+```bash
+npm run test:e2e:ui          # Interactive runner (requires the same test build)
+npx playwright show-report # Open the last HTML report
+```
+
+Reports go to `playwright-report/`; failed tests retain traces and screenshots in
+`test-results/`. Generated reports are gitignored.
+
+### GitHub Actions
+
+[CI workflow](./.github/workflows/ci.yml) runs on every pull request and push to
+`main`, using Node.js 22 and `npm ci`. Two independent jobs run:
+
+1. **Lint, types, and unit coverage**: full-app ESLint, Next route type generation
+   plus TypeScript, and the gated Vitest coverage run.
+2. **Production build and Chromium E2E**: browser installation, production build,
+   and Playwright tests with two workers and up to two retries.
+
+No GitHub secrets or live test accounts are needed. Coverage and Playwright
+reports are uploaded as artifacts, including on failure when reports exist, with
+14-day retention. Stale runs for the same PR/ref are cancelled. To prevent merging
+when tests fail, configure the repository's branch protection/ruleset to require
+both job checks; the workflow alone does not enforce merge protection.
+
 ## Deployment
 
 The app is a standard Next.js application and can be deployed to any platform that supports it.

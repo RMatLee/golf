@@ -17,8 +17,13 @@ import { supabase } from "@/lib/supabase";
 import { readLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
 import { statRoundSchema } from "@/lib/schemas";
 import { z } from "zod";
+import type { CourseRow, RoundRow } from "@/lib/types";
 
 export type StatRound = z.infer<typeof statRoundSchema>;
+type StatQueryRow = Pick<RoundRow, "id" | "date" | "score" | "par" | "putts"> & {
+  holes: number | null;
+  courses: Pick<CourseRow, "name" | "rating" | "slope"> | null;
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -41,17 +46,18 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from("rounds")
       .select("id, date, score, par, holes, putts, courses(name, rating, slope)")
-      .order("date", { ascending: true });
+      .order("date", { ascending: true })
+      .returns<StatQueryRow[]>();
 
     if (error) {
       console.error("[/api/stats] Supabase error:", error);
       return NextResponse.json({ error: "Failed to fetch stats" }, { status: 502 });
     }
 
-    const mapped = (data ?? []).map((r: any) => {
-      const rating    = (r.courses?.rating ?? 72) as number;
-      const slope     = (r.courses?.slope  ?? 113) as number;
-      const holes     = (r.holes ?? 18) as number;
+    const mapped = (data ?? []).map((r) => {
+      const rating    = r.courses?.rating ?? 72;
+      const slope     = r.courses?.slope ?? 113;
+      const holes     = r.holes ?? 18;
       const adjRating = holes === 9 ? rating / 2 : rating;
       const handicap  = Math.round((r.score - adjRating) * 113 / slope * 10) / 10;
       return {

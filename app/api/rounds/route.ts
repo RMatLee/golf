@@ -12,8 +12,13 @@ import { supabase } from "@/lib/supabase";
 import { readLimiter, getIP, rateLimitResponse } from "@/lib/ratelimit";
 import { roundItemSchema } from "@/lib/schemas";
 import { z } from "zod";
+import type { CourseRow, RoundRow } from "@/lib/types";
 
 export type RoundItem = z.infer<typeof roundItemSchema>;
+type RoundQueryRow = Pick<RoundRow, "id" | "date" | "score" | "par"> & {
+  holes: number | null;
+  courses: Pick<CourseRow, "name"> | null;
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -36,14 +41,15 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from("rounds")
       .select("id, date, score, par, holes, courses(name)")
-      .order("date", { ascending: false });
+      .order("date", { ascending: false })
+      .returns<RoundQueryRow[]>();
 
     if (error) {
       console.error("[/api/rounds] Supabase error:", error);
       return NextResponse.json({ error: "Failed to fetch rounds" }, { status: 502 });
     }
 
-    const mapped = (data ?? []).map((r: any) => ({
+    const mapped = (data ?? []).map((r) => ({
       id:     r.id,
       date:   r.date,
       score:  r.score,
